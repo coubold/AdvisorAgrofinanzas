@@ -1,0 +1,4166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BBVA · Asistente de AgroFinanzas</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --nv:#004481;--nv2:#003366;--bl:#1473B7;--aq:#02A5A5;--aq2:#028A8A;
+  --sd:#F5F3EF;--w:#FFFFFF;--g1:#F2F2F2;--g2:#E0E0E0;--g4:#9E9E9E;--g6:#555;--g9:#1A1A1A;
+  --gn:#1B7A55;--gna:#E2F5EC;--lb:#E5EFF8;--am:#B86B00;--ama:#FEF3DE;--rd:#C62828;--rda:#FDEAEA;
+  --fs:14px;--fss:12px;--rad:12px;
+}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;background:var(--sd);color:var(--g9);font-size:var(--fs);}
+
+/* ── Layout ── */
+#app{display:flex;flex-direction:column;min-height:100%;}
+.topbar{background:var(--nv);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:500;flex-shrink:0;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo svg{height:26px;flex-shrink:0;}
+.agb{font-size:8px;font-weight:700;color:var(--w);border:1.5px solid rgba(255,255,255,.5);border-radius:4px;padding:2px 6px;letter-spacing:.6px;white-space:nowrap;}
+
+/* ── Location search ── */
+.loc-search{position:absolute;bottom:10px;left:10px;z-index:400;display:flex;flex-direction:column;gap:0;max-width:340px;width:calc(100% - 110px);}
+.loc-input-wrap{display:flex;gap:6px;}
+.loc-input{flex:1;border:none;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;background:var(--w);box-shadow:0 1px 4px rgba(0,0,0,.18);outline:none;min-width:0;}
+.loc-input::placeholder{color:var(--g4);}
+.loc-btn{background:var(--w);border:none;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.18);color:var(--nv);white-space:nowrap;}
+.loc-btn:hover{background:var(--g1);}
+.loc-results{background:var(--w);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);max-height:200px;overflow-y:auto;display:none;margin-bottom:6px;}
+.loc-results.show{display:block;}
+.loc-item{padding:10px 14px;font-size:12px;cursor:pointer;border-bottom:.5px solid var(--g2);line-height:1.4;}
+.loc-item:last-child{border:none;}
+.loc-item:hover{background:var(--g1);}
+.loc-item b{color:var(--nv);}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.tbtn{background:rgba(255,255,255,.1);color:white;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;}
+.tbtn:hover{background:rgba(255,255,255,.18);}
+.tbtn.active-tab{background:var(--aq);color:white;}
+
+/* ── Screens ── */
+.screen{display:none;flex:1;}
+.screen.active{display:flex;flex-direction:column;}
+
+/* ── Two-pane ── */
+.panes{display:grid;grid-template-columns:420px 1fr;flex:1;min-height:0;}
+.left-pane{background:var(--w);border-right:.5px solid var(--g2);display:flex;flex-direction:column;overflow-y:auto;}
+.right-pane{display:flex;flex-direction:column;position:relative;}
+@media(max-width:860px){
+  .panes{grid-template-columns:1fr;grid-template-rows:auto 1fr;}
+  .left-pane{border-right:none;border-bottom:.5px solid var(--g2);max-height:50vh;}
+  .right-pane{min-height:260px;}
+}
+
+/* ── Pane header ── */
+.ph{background:var(--nv);padding:16px 20px 14px;flex-shrink:0;}
+.ph-title{font-size:17px;font-weight:700;color:white;letter-spacing:-.3px;}
+.ph-sub{font-size:11px;color:rgba(255,255,255,.55);margin-top:3px;}
+.ph-tags{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+.ph-tag{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;}
+.ph-tag-crop{background:rgba(255,255,255,.12);color:white;}
+.ph-tag-etapa{background:var(--aq);color:white;}
+.ph-tag-n{color:rgba(255,255,255,.4);font-size:10px;display:flex;align-items:center;}
+
+/* ── Map ── */
+#map{flex:1;min-height:300px;z-index:1;}
+.map-controls{position:absolute;top:10px;right:10px;z-index:400;display:flex;flex-direction:column;gap:6px;}
+.mc-btn{background:var(--w);border:.5px solid var(--g2);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--g9);white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.12);transition:all .15s;}
+.mc-btn:hover{background:var(--g1);}
+.mc-btn.active{background:var(--nv);color:white;border-color:var(--nv);}
+
+/* ── Forms ── */
+.fp{padding:16px 20px;}
+.sl{font-size:11px;font-weight:700;color:var(--g9);margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.frow{margin-bottom:10px;}
+.flbl{font-size:11px;font-weight:600;color:var(--g6);display:block;margin-bottom:4px;}
+.finp{width:100%;border:.5px solid var(--g2);border-radius:10px;padding:9px 12px;font-size:14px;font-family:inherit;color:var(--g9);background:var(--w);outline:none;transition:border-color .15s;}
+.finp:focus{border-color:var(--bl);}
+.finp[type=password]{letter-spacing:.1em;}
+.finfo{background:var(--g1);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--g6);line-height:1.5;margin-bottom:10px;}
+.finfo b{color:var(--g9);}
+.ha-disp{background:var(--gna);border-radius:10px;padding:9px 12px;font-size:14px;font-weight:700;color:var(--gn);margin-bottom:10px;display:none;}
+.fdiv{height:.5px;background:var(--g2);margin:14px 0;}
+
+/* ── CTA ── */
+.cta-p{background:var(--aq);color:white;font-size:15px;font-weight:700;padding:13px;border-radius:12px;border:none;cursor:pointer;display:block;width:100%;text-align:center;font-family:inherit;transition:opacity .15s;}
+.cta-p:disabled{opacity:.4;cursor:not-allowed;}
+.cta-p:not(:disabled):hover{opacity:.9;}
+.cta-s{background:var(--w);color:var(--bl);font-size:14px;font-weight:600;padding:11px;border-radius:12px;border:.5px solid var(--g2);cursor:pointer;display:block;width:100%;text-align:center;margin-top:8px;font-family:inherit;}
+.cta-s:hover{background:var(--g1);}
+.bkb{display:flex;align-items:center;gap:4px;color:rgba(255,255,255,.75);font-size:13px;background:none;border:none;font-family:inherit;cursor:pointer;padding:0 0 10px;}
+.bkb:hover{color:white;}
+
+/* ── Loading ── */
+.load-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;gap:20px;}
+.spin{width:44px;height:44px;border:3px solid var(--g2);border-top-color:var(--aq);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load-steps{width:100%;max-width:340px;}
+.lstep{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--g2);}
+.lstep:last-child{border:none;}
+.lsdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.lsdot.done{background:var(--gn);}
+.lsdot.run{background:var(--aq);animation:pulse .8s ease infinite;}
+.lsdot.wait{background:var(--g2);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.lstx{font-size:13px;color:var(--g9);}
+.lstx.done{color:var(--g4);text-decoration:line-through;}
+.load-tl{font-size:17px;font-weight:700;color:var(--g9);}
+.load-st{font-size:12px;color:var(--g4);text-align:center;}
+
+/* ── Reco screen ── */
+.reco-panes{display:grid;grid-template-columns:420px 1fr;flex:1;min-height:0;}
+@media(max-width:860px){.reco-panes{grid-template-columns:1fr;}}
+.reco-list-wrap{overflow-y:auto;padding:12px 16px 24px;}
+.reco-detail-wrap{overflow-y:auto;padding:20px 24px 24px;background:var(--sd);}
+
+/* ── Category filter bar ── */
+.cat-bar{display:flex;gap:6px;padding:12px 16px 4px;flex-wrap:wrap;background:var(--w);border-bottom:.5px solid var(--g2);}
+.cat-chip{font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;border:.5px solid var(--g2);background:var(--w);color:var(--g6);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.cat-chip:hover{border-color:var(--bl);color:var(--bl);}
+.cat-chip.active{background:var(--nv);color:white;border-color:var(--nv);}
+.cat-chip .chip-count{font-size:9px;opacity:.6;margin-left:3px;}
+
+/* ── Summary strip ── */
+.reco-summary{display:flex;flex-direction:column;background:var(--w);border-bottom:.5px solid var(--g2);max-height:50vh;overflow-y:auto;}
+.reco-stat{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.reco-stat-n{font-size:18px;font-weight:800;color:var(--nv);}
+.reco-stat-l{font-size:10px;color:var(--g4);line-height:1.2;}
+
+/* ── Conv cards ── */
+.ccard{background:var(--w);border-radius:14px;border:.5px solid var(--g2);padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color .15s,box-shadow .15s;position:relative;}
+.ccard:hover{border-color:var(--bl);box-shadow:0 2px 12px rgba(20,115,183,.1);}
+.ccard.selected{border-color:var(--bl);border-width:1.5px;}
+.rnk{width:22px;height:22px;border-radius:50%;background:var(--nv);color:white;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;position:absolute;top:13px;right:14px;}
+.ctop{display:flex;align-items:center;gap:11px;}
+.cico{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;}
+.cnm{font-size:14px;font-weight:700;color:var(--g9);letter-spacing:-.1px;padding-right:30px;}
+.cct{font-size:11px;color:var(--g4);margin-top:2px;}
+.csrow{display:flex;align-items:center;gap:8px;margin-top:10px;}
+.csbg{flex:1;height:4px;background:var(--g2);border-radius:2px;overflow:hidden;}
+.csfl{height:100%;border-radius:2px;transition:width .4s ease;}
+.csn{font-size:12px;font-weight:700;min-width:40px;text-align:right;}
+.ctgs{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;}
+.tpill{font-size:10px;padding:3px 8px;border-radius:8px;font-weight:600;}
+.tg{background:var(--gna);color:var(--gn);}
+.tb{background:var(--lb);color:var(--bl);}
+.ta{background:var(--ama);color:var(--am);}
+.cex{font-size:12px;color:var(--g6);margin-top:8px;line-height:1.5;}
+
+/* ── Detail pane ── */
+.det-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;color:var(--g4);}
+.det-empty svg{opacity:.3;}
+.det-card{background:var(--w);border-radius:16px;border:.5px solid var(--g2);margin-bottom:14px;overflow:hidden;}
+.det-card-hdr{background:var(--nv);padding:16px 18px;}
+.det-hero{display:flex;align-items:center;gap:13px;}
+.det-ico{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;}
+.det-nm{font-size:18px;font-weight:800;color:white;letter-spacing:-.4px;}
+.det-cat{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px;}
+.det-sc{margin-left:auto;text-align:right;}
+.det-scv{font-size:28px;font-weight:900;color:var(--aq);letter-spacing:-1px;}
+.det-scl{font-size:9px;color:rgba(255,255,255,.4);}
+
+/* ── Explanation blocks ── */
+.expl-blocks{padding:0 18px 14px;}
+.expl-block{border-radius:10px;padding:12px 14px;margin-bottom:8px;font-size:12.5px;line-height:1.6;}
+.expl-block strong{font-weight:700;}
+.expl-det{background:var(--lb);border-left:3px solid var(--bl);color:#1A3A5C;}
+.expl-etapa{background:#F0F0F0;border-left:3px solid var(--g4);color:var(--g6);}
+.expl-cat{background:var(--gna);border-left:3px solid var(--gn);color:#1A3A3A;}
+.expl-fin{background:var(--ama);border-left:3px solid var(--am);color:#5A3A00;}
+.expl-tag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;opacity:.6;}
+
+/* ── Conditions grid ── */
+.cgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 18px;}
+@media(max-width:600px){.cgrid{grid-template-columns:repeat(2,1fr);}}
+.cbox{background:var(--g1);border-radius:11px;padding:11px 12px;}
+.clbl{font-size:10px;color:var(--g4);margin-bottom:4px;font-weight:500;}
+.cv{font-size:17px;font-weight:800;color:var(--g9);}
+.cv-y{color:var(--gn);}
+
+/* ── Sub-products ── */
+.subs-wrap{padding:0 18px 16px;}
+.sub-row{background:var(--w);border-radius:11px;border:.5px solid var(--g2);padding:10px 13px;margin-bottom:7px;display:flex;align-items:center;gap:10px;}
+.smon{width:38px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;flex-shrink:0;}
+.sars{background:#E5EFF8;color:#004481;}
+.susd{background:#E2F5EC;color:#1B7A55;}
+.sinf{flex:1;}
+.sds{font-size:12px;font-weight:600;color:var(--g9);}
+.spl{font-size:10px;color:var(--g4);margin-top:1px;}
+.stna-col{text-align:right;}
+.stnav{font-size:16px;font-weight:800;color:var(--g9);}
+.stnav-z{color:var(--gn);}
+.stnal{font-size:9px;color:var(--g4);}
+.ssub{font-size:9px;color:var(--am);font-weight:600;margin-top:1px;}
+
+/* ── Modal ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:600;display:none;align-items:flex-end;justify-content:center;}
+.modal-bg.show{display:flex;}
+.modal{background:var(--w);border-radius:20px 20px 0 0;padding:20px 22px 34px;width:100%;max-width:500px;animation:slideUp .3s ease;}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+@media(min-width:600px){.modal-bg{align-items:center;}.modal{border-radius:20px;margin:20px;}}
+.mhandle{width:36px;height:4px;background:var(--g2);border-radius:2px;margin:0 auto 16px;}
+.mtl{font-size:17px;font-weight:700;margin-bottom:4px;}
+.mst{font-size:12px;color:var(--g4);margin-bottom:18px;line-height:1.5;}
+.exec-card{display:flex;align-items:center;gap:13px;background:var(--g1);border-radius:14px;padding:13px 15px;margin-bottom:16px;}
+.exec-av{width:46px;height:46px;border-radius:50%;background:var(--nv);display:flex;align-items:center;justify-content:center;color:white;font-size:15px;font-weight:700;flex-shrink:0;}
+.exec-nm{font-size:15px;font-weight:700;}
+.exec-ro{font-size:11px;color:var(--g4);margin-top:1px;}
+.exec-suc{font-size:10px;color:var(--bl);margin-top:2px;font-weight:600;}
+.mopt{display:flex;align-items:center;gap:13px;padding:12px 0;border-bottom:.5px solid var(--g2);cursor:pointer;}
+.mopt:last-of-type{border:none;}
+.mopt:hover .mopt-nm{color:var(--bl);}
+.mopt-ico{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.mopt-nm{font-size:14px;font-weight:600;}
+.mopt-st{font-size:11px;color:var(--g4);margin-top:1px;}
+.mopt-arr{margin-left:auto;color:var(--g4);}
+.cancel-btn{width:100%;padding:13px;background:none;border:.5px solid var(--g2);border-radius:12px;font-size:14px;font-weight:600;color:var(--g6);cursor:pointer;font-family:inherit;margin-top:14px;}
+
+/* ── Alert ── */
+.alert{border-radius:10px;padding:10px 13px;font-size:12px;margin-bottom:10px;display:none;line-height:1.5;}
+.alert-warn{background:var(--ama);color:#7A4500;border:.5px solid #F0C060;}
+.alert-ok{background:var(--gna);color:#145C3A;border:.5px solid #90D8B0;}
+.alert-err{background:#FDEAEA;color:#8B1A1A;border:.5px solid #F0AAAA;}
+.api-status{font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;}
+.api-status.ok{background:var(--gna);color:var(--gn);}
+.api-status.mock{background:var(--ama);color:var(--am);}
+
+/* ── Section label in det ── */
+.det-sec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--g4);padding:4px 18px 8px;}
+</style>
+</head>
+<body>
+</head>
+<body>
+<div id="app">
+
+<!-- ── TOPBAR ── -->
+<div class="topbar">
+  <div class="logo"><svg viewBox="0 0 600 179.8" height="24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M432.2,24.4l-51.6,98.2c-1.1,2.1-4.3,2.1-5.4,0l-51.6-98.2c-0.5-1-1.5-1.6-2.6-1.6h-25c-1.7,0-2.8,1.8-2,3.3l81.3,152.2c1.1,2.1,4.1,2.1,5.3,0l81.3-152.2c0.8-1.5-0.3-3.3-2-3.3h-25C433.7,22.8,432.7,23.4,432.2,24.4z"/><path d="M461.5,155.5l51.6-98.2c1.1-2.1,4.3-2.1,5.4,0l51.6,98.2c0.5,1,1.5,1.6,2.6,1.6h25c1.7,0,2.8-1.8,2-3.3L518.4,1.6c-1.1-2.1-4.1-2.1-5.3,0l-81.3,152.2c-0.8,1.5,0.3,3.3,2,3.3h25C459.9,157,461,156.4,461.5,155.5z"/><path d="M108.8,95.2c10.8-5.4,17.5-17.1,17.5-31.4c0-24.5-19.1-41.1-46-41.1H3c-1.7,0-3,1.3-3,3v151.1c0,1.7,1.3,3,3,3h74c37,0,56.5-15.9,56.5-47.1C133.5,102.3,108.8,95.2,108.8,95.2z M29,45.5h45.9c16.9,0,25.5,7.2,25.5,20.6c0,13.4-8.6,20.6-25.5,20.6H29c-1.6,0-3-1.3-3-3V48.5C26,46.8,27.3,45.5,29,45.5z M75.5,157l-46.5,0c-1.7,0-3-1.3-3-3l0-41.7c0-1.6,1.3-3,3-3h46.5c22.2,0,32.1,6.3,32.1,23.8C107.5,150.8,97.9,157,75.5,157z"/><path d="M267.5,95.2c10.8-5.4,17.5-17.1,17.5-31.4c0-24.5-19.1-41.1-46-41.1h-77.4c-1.7,0-3,1.3-3,3v151.1c0,1.7,1.3,3,3,3h74c37,0,56.5-15.9,56.5-47.1C292.2,102.3,267.5,95.2,267.5,95.2z M187.7,45.5h45.9c16.9,0,25.5,7.2,25.5,20.6c0,13.4-8.6,20.6-25.5,20.6h-45.9c-1.7,0-3-1.3-3-3V48.5C184.7,46.8,186,45.5,187.7,45.5z M234.1,157l-46.5,0c-1.6,0-3-1.3-3-3v-41.7c0-1.6,1.3-3,3-3h46.5c22.2,0,32.1,6.3,32.1,23.8C266.2,150.8,256.5,157,234.1,157z"/></svg><span class="agb">ASISTENTE DE AGROFINANZAS</span></div>
+  <div class="topbar-right">
+    <span class="api-status mock" id="api-status">MOCK</span>
+    <button class="tbtn" id="tab-config" onclick="showTab('config')">⚙ API</button>
+  </div>
+</div>
+
+<!-- ══ SCREEN: MAIN ══ -->
+<div class="screen active" id="scr-main">
+  <div class="panes">
+    <div class="left-pane">
+      <div class="ph">
+        <div class="ph-title">Nuevo asesoramiento</div>
+        <div class="ph-sub">Dibujá el contorno de tu lote y obtené recomendaciones personalizadas de convenios BBVA</div>
+      </div>
+      <div class="fp">
+        <div class="sl">Datos del cliente</div>
+        <div class="fgrid">
+          <div><label class="flbl">CUIT</label><input class="finp" id="inp-cuit" placeholder="20-12345678-9"></div>
+          <div><label class="flbl">Nombre del lote</label><input class="finp" id="inp-nombre" placeholder="Lote Norte…"></div>
+        </div>
+        <input type="hidden" id="inp-loc"><input type="hidden" id="inp-prov">
+        <div class="finfo" id="map-tip">
+          Dibujá el polígono de tu lote usando la herramienta <b>◇</b> en el mapa. Hacé clic punto a punto y doble clic para cerrar.
+        </div>
+        <div class="ha-disp" id="ha-disp">— ha</div>
+        <div class="fdiv"></div>
+        <div class="sl">Detección</div>
+        <div id="alert-api" class="alert alert-warn" style="display:block">Credenciales de producción pre-cargadas. Si la API devuelve error CORS, se usará detección simulada.</div>
+        <button class="cta-p" id="btn-consultar" disabled onclick="consultar()">Detectar cultivo y ver convenios →</button>
+        <button class="cta-s" onclick="showTab('config')">Configurar credenciales Bold API</button>
+      </div>
+    </div>
+    <div class="right-pane">
+      <div id="map"></div>
+      <div class="loc-search">
+        <div class="loc-results" id="loc-results"></div>
+        <div class="loc-input-wrap">
+          <input class="loc-input" id="loc-input" placeholder="Buscar localidad…" oninput="debounceLoc()" onkeydown="if(event.key==='Enter'){event.preventDefault();searchLoc();}">
+          <button class="loc-btn" onclick="searchLoc()">🔍</button>
+        </div>
+      </div>
+      <div class="map-controls">
+        <button class="mc-btn active" id="btn-osm" onclick="setLayer('osm')">Mapa</button>
+        <button class="mc-btn" id="btn-sat" onclick="setLayer('sat')">Satelital</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCREEN: CONFIG ══ -->
+<div class="screen" id="scr-config">
+  <div class="panes" style="grid-template-columns:420px 1fr;">
+    <div class="left-pane">
+      <div class="ph">
+        <button class="bkb" onclick="showTab('main')">← Volver al mapa</button>
+        <div class="ph-title">Configuración API Bold</div>
+        <div class="ph-sub">OAuth2 client_credentials — endpoint /{env}/v1/oauth2/token</div>
+      </div>
+      <div class="fp">
+        <div class="frow"><label class="flbl">Username (API Key)</label><input class="finp" id="cfg-client" placeholder="Username Bold API" value="uFDj6pZY83x7nqbqABymx4dVMRaFC0fwmv7gc6E8lrfHZ0jA"></div>
+        <div class="frow"><label class="flbl">Password (API Secret)</label><input class="finp" type="password" id="cfg-secret" placeholder="Password Bold API" value="i6rv582nUyftZskIsqQSwqQ7x5ehrKuSk6Nw2NlfUtBozFPVnMBwsqs2EuJalWwl"></div>
+        <div class="frow">
+          <label class="flbl">Ambiente</label>
+          <select class="finp" id="cfg-env"><option value="uat">UAT (testing)</option><option value="prod" selected>Producción</option></select>
+        </div>
+        <div id="alert-cfg" class="alert"></div>
+        <button class="cta-p" onclick="testApi()">Verificar conexión →</button>
+        <div class="finfo" style="margin-top:12px;">
+          <b>Nota:</b> Las credenciales se guardan solo en esta sesión del browser. Si la API devuelve error CORS, la app cae automáticamente al modo demo.
+        </div>
+        <div class="fdiv"></div>
+        <div class="sl">Estado actual</div>
+        <div class="finfo" id="cfg-state">Credenciales de producción pre-cargadas. Presioná "Verificar conexión" para testear.</div>
+      </div>
+    </div>
+    <div class="right-pane" style="padding:32px;background:var(--sd);">
+      <div style="max-width:440px;">
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px;">Cómo funciona</div>
+        <div style="font-size:13px;color:var(--g6);line-height:1.7;margin-bottom:16px;">Cuando configurás tus credenciales, la app llama a la API de Bold directamente:</div>
+        <div style="background:var(--w);border-radius:14px;border:.5px solid var(--g2);overflow:hidden;">
+          <div style="padding:13px 16px;border-bottom:.5px solid var(--g2);display:flex;align-items:center;gap:10px;">
+            <div style="width:28px;height:28px;border-radius:8px;background:var(--gna);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--gn);flex-shrink:0;">1</div>
+            <div><div style="font-size:13px;font-weight:600;">Obtener token</div><div style="font-size:11px;color:var(--g4);">POST /{env}/v1/oauth2/token?grant_type=client_credentials (Basic Auth)</div></div>
+          </div>
+          <div style="padding:13px 16px;border-bottom:.5px solid var(--g2);display:flex;align-items:center;gap:10px;">
+            <div style="width:28px;height:28px;border-radius:8px;background:var(--lb);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--bl);flex-shrink:0;">2</div>
+            <div><div style="font-size:13px;font-weight:600;">Crop Detection</div><div style="font-size:11px;color:var(--g4);">POST /v2/cropdetection con el polígono</div></div>
+          </div>
+          <div style="padding:13px 16px;border-bottom:.5px solid var(--g2);display:flex;align-items:center;gap:10px;">
+            <div style="width:28px;height:28px;border-radius:8px;background:var(--lb);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--bl);flex-shrink:0;">3</div>
+            <div><div style="font-size:13px;font-weight:600;">Crop Detection Hist</div><div style="font-size:11px;color:var(--g4);">POST /v2/cropdetection-hist — historial de campañas</div></div>
+          </div>
+          <div style="padding:13px 16px;display:flex;align-items:center;gap:10px;">
+            <div style="width:28px;height:28px;border-radius:8px;background:var(--gna);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--gn);flex-shrink:0;">4</div>
+            <div><div style="font-size:13px;font-weight:600;">Scoring local</div><div style="font-size:11px;color:var(--g4);">Motor de recomendación con 57 merchants × 166 sub-productos</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCREEN: LOADING ══ -->
+<div class="screen" id="scr-loading">
+  <div class="load-wrap">
+    <div class="spin"></div>
+    <div style="text-align:center;">
+      <div class="load-tl" id="load-tl">Analizando tu lote…</div>
+      <div class="load-st" id="load-st">Procesando el lote</div>
+    </div>
+    <div class="load-steps" id="load-steps">
+      <div class="lstep"><div class="lsdot run" id="dot0"></div><span class="lstx" id="tx0">Sensorización</span></div>
+      <div class="lstep"><div class="lsdot wait" id="dot1"></div><span class="lstx" id="tx1">Analizando cultivo actual del lote</span></div>
+      <div class="lstep"><div class="lsdot wait" id="dot2"></div><span class="lstx" id="tx2">Revisando campañas anteriores</span></div>
+      <div class="lstep"><div class="lsdot wait" id="dot3"></div><span class="lstx" id="tx3">Seleccionando mejores convenios</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCREEN: RECOMENDACIONES ══ -->
+<div class="screen" id="scr-reco">
+  <div class="ph" id="reco-ph" style="flex-shrink:0;">
+    <button class="bkb" onclick="showTab('main')">← Nuevo lote</button>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <div>
+        <div class="ph-title" id="reco-title">–</div>
+        <div class="ph-sub" id="reco-sub">–</div>
+      </div>
+      <div id="conf-badge" style="display:none;">–</div>
+    </div>
+    <div class="ph-tags">
+      <span class="ph-tag ph-tag-crop" id="crop-tag">–</span>
+      <span class="ph-tag ph-tag-etapa" id="etapa-tag">–</span>
+      <span class="ph-tag ph-tag-n" id="n-tag">–</span>
+    </div>
+  </div>
+  <!-- Summary strip -->
+  <div class="reco-summary" id="reco-summary"></div>
+  <!-- Category filter -->
+  <div class="cat-bar" id="cat-bar"></div>
+  <div class="reco-panes" style="flex:1;min-height:0;">
+    <div style="background:var(--sd);border-right:.5px solid var(--g2);display:flex;flex-direction:column;overflow:hidden;">
+      <div class="reco-list-wrap" id="reco-list"></div>
+    </div>
+    <div class="reco-detail-wrap" id="det-wrap">
+      <div class="det-empty">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="#9E9E9E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="#9E9E9E" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <div style="font-size:14px;font-weight:500;">Seleccioná un convenio para ver el detalle</div>
+        <div style="font-size:12px;">Las condiciones, plazos y explicación completa aparecen acá</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL ejecutivo ── -->
+<div class="modal-bg" id="modal-bg" onclick="hideModal(event)">
+  <div class="modal">
+    <div class="mhandle"></div>
+    <div class="mtl">Contactar ejecutivo BBVA</div>
+    <div class="mst">Tu ejecutiva de cuenta BBVA Agro puede ayudarte a gestionar este convenio y cerrar la operación.</div>
+    <div class="exec-card">
+      <div class="exec-av">ML</div>
+      <div>
+        <div class="exec-nm">María López</div>
+        <div class="exec-ro">Ejecutiva BBVA Agro</div>
+        <div class="exec-suc">Sucursal Córdoba Centro</div>
+      </div>
+    </div>
+    <div class="mopt">
+      <div class="mopt-ico" style="background:#E2F5EC;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 014.18 12 19.79 19.79 0 011.11 3.38 2 2 0 013.09 1.2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L7.09 9.08A16 16 0 0014.91 16.9l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" stroke="#1B7A55" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div><div class="mopt-nm">Llamar</div><div class="mopt-st">+54 351 XXX-XXXX</div></div>
+      <div class="mopt-arr">›</div>
+    </div>
+    <div class="mopt">
+      <div class="mopt-ico" style="background:#E5EFF8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="#1473B7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><polyline points="22,6 12,13 2,6" stroke="#1473B7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div><div class="mopt-nm">Enviar mail</div><div class="mopt-st"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2d4847484e5859445b42034c4a5f426d4f4f5b4c034e4240034c5f">[email&#160;protected]</a></div></div>
+      <div class="mopt-arr">›</div>
+    </div>
+    <div class="mopt">
+      <div class="mopt-ico" style="background:#F4F2EE;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="5" y="2" width="14" height="20" rx="2" stroke="#555" stroke-width="1.8"/><path d="M12 18h.01" stroke="#555" stroke-width="2" stroke-linecap="round"/></svg></div>
+      <div><div class="mopt-nm">Solicitar turno</div><div class="mopt-st">Sucursal presencial</div></div>
+      <div class="mopt-arr">›</div>
+    </div>
+    <button class="cancel-btn" onclick="hideModal(null)">Cancelar</button>
+  </div>
+</div>
+
+
+
+<!-- Leaflet -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+<script>
+// ╔═══════════════════════════════════════════════════════╗
+// ║  1. CATÁLOGO BBVA (57 merchants)                     ║
+// ║  Para editar un merchant, buscá por nombre            ║
+// ╚═══════════════════════════════════════════════════════╝
+// ═══════════════════════════════════════════════════════
+// CATÁLOGO BBVA — 57 merchants, 166 sub-productos
+// Fuente: API /openmarket/servicios/agro/convenios
+// Fecha: marzo 2026
+// ═══════════════════════════════════════════════════════
+const CATALOG = [
+  {
+    "id": 1,
+    "nombre": "INDUSTRIAS COMOFRA S.R.L.",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 2.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 27.5,
+        "subsidio": 12,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 2.25,
+        "subsidio": 12,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "nombre": "LARTIRIGOYEN Y CIA SA",
+    "cat": "semillas",
+    "subcat": "semillas_certificadas",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": false,
+    "tnaMin": 3.9,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.9,
+        "subsidio": 0,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.9,
+        "subsidio": 0,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 4.75,
+        "subsidio": 0,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 4.9,
+        "subsidio": 0,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "nombre": "SYNGENTA AGRO S.A.",
+    "cat": "semillas",
+    "subcat": "semillas_certificadas",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 10.42,
+        "subsidio": 6,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 23.15,
+        "subsidio": 6,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 27.41,
+        "subsidio": 6,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 29.55,
+        "subsidio": 6,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 4.9,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 4.9,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 4.9,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 4.9,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "nombre": "ADAMA ARGENTINA SA",
+    "cat": "proteccion_cultivos",
+    "subcat": "herbicidas_fungicidas",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "desarrollo",
+      "proteccion"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 4.9,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 4.9,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 4.9,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 4.9,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      }
+    ]
+  },
+  {
+    "id": 11,
+    "nombre": "FERCAM",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 22,
+        "subsidio": 20,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 12,
+    "nombre": "GIORGI SA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 3.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 27.5,
+        "subsidio": 12,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.25,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 13,
+    "nombre": "PIERSANTI",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 25.5,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 14,
+    "nombre": "PAUNY",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 29,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 15,
+    "nombre": "CRUCIANELLI",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 18,
+        "subsidio": 25,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 16,
+    "nombre": "FERTEC",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 18,
+        "subsidio": 25,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 17,
+    "nombre": "BBVA SITE",
+    "cat": "financiamiento",
+    "subcat": "prestamo_campana",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "desarrollo",
+      "proteccion",
+      "cosecha",
+      "poscosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 4.5,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 4.5,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 4.5,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0.21,
+        "subsidio": 4.5,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      }
+    ]
+  },
+  {
+    "id": 18,
+    "nombre": "STARA ARGENTINA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 25.5,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 19,
+    "nombre": "RICARDO VENTURINO",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 5.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 32,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 5.25,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 20,
+    "nombre": "CNH ARGENTINA SA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 4.75,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 29,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 4.75,
+        "subsidio": 7,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 21,
+    "nombre": "AGCO ARGENTINA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 2.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 27.5,
+        "subsidio": 12,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 2.25,
+        "subsidio": 12,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 22,
+    "nombre": "ZAFRA SA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 5.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 32,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 5.25,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 23,
+    "nombre": "SALA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 5.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 32,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 5.25,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 24,
+    "nombre": "RATTO HERMANOS",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 5.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 32,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 5.25,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 25,
+    "nombre": "REMONDA CASTRO",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 5.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 32,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 5.25,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 26,
+    "nombre": "CHAYE HNOS SRL",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 5.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 32,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 5.25,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 27,
+    "nombre": "IND. METALÚRGICAS CESTARI",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 2.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 25.5,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 2.25,
+        "subsidio": 12,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 28,
+    "nombre": "AGRONORTE",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 5.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 32,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 5.25,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 29,
+    "nombre": "DIESEL LANGE SRL",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 5.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 32,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 5.25,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 30,
+    "nombre": "AGROINDUSTRIA Y SERVICIOS",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 25.5,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 31,
+    "nombre": "AGROMETAL",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 25.5,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 32,
+    "nombre": "CONCI SA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 5.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 32,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 5.25,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 33,
+    "nombre": "BUFALO SA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 3.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 29,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.25,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 34,
+    "nombre": "BERGER SA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 3.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 29,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.25,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 35,
+    "nombre": "AKRON SA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 18,
+        "subsidio": 25,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 36,
+    "nombre": "KUBOTA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 18,
+        "subsidio": 25,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 37,
+    "nombre": "PRABA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 3.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 29,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.25,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 38,
+    "nombre": "PIEROBON SA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 2.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 27.5,
+        "subsidio": 12,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 2.25,
+        "subsidio": 12,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 39,
+    "nombre": "VALMONT",
+    "cat": "maquinaria",
+    "subcat": "riego",
+    "ars": true,
+    "usd": false,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 29,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 29,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 40,
+    "nombre": "ROLAND",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 3.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 29,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.25,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 41,
+    "nombre": "ASCANELLI",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 25.5,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 42,
+    "nombre": "AMERICAN AGRO SA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 3.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 29,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.25,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 43,
+    "nombre": "TEKRON",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 18,
+        "subsidio": 25,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 44,
+    "nombre": "TANZI SA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 3.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 29,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.25,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 45,
+    "nombre": "MAIZCO",
+    "cat": "maquinaria",
+    "subcat": "cabezales_cosecha",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 25.5,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 46,
+    "nombre": "PLANTIUM SA",
+    "cat": "maquinaria",
+    "subcat": "pulverizacion",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 25.5,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 47,
+    "nombre": "GEOSISTEMAS SRL",
+    "cat": "maquinaria",
+    "subcat": "tecnologia_precision",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 25.5,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 48,
+    "nombre": "DYE SA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 3.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 29,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.25,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 49,
+    "nombre": "IRRI AR SA",
+    "cat": "maquinaria",
+    "subcat": "riego",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 3.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 29,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.25,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 50,
+    "nombre": "MAINERO",
+    "cat": "maquinaria",
+    "subcat": "cabezales_cosecha",
+    "ars": true,
+    "usd": false,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 25.5,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 25.5,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 51,
+    "nombre": "ALBERTO GAUSS E HIJOS",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 25.5,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 52,
+    "nombre": "BERTINI",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 3.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 29,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.25,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 53,
+    "nombre": "MULTIJACTO",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 3.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 25.5,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.25,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 54,
+    "nombre": "KUHN",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 3.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 29,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.25,
+        "subsidio": 10,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 55,
+    "nombre": "METALFOR",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 2.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 27.5,
+        "subsidio": 12,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 2.25,
+        "subsidio": 12,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 56,
+    "nombre": "PARRA",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 5.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 32,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 5.25,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 57,
+    "nombre": "SARTOR",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": true,
+    "tnaMin": 5.25,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 32,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 5.25,
+        "subsidio": 6,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 58,
+    "nombre": "MONTECOR",
+    "cat": "maquinaria",
+    "subcat": "maquinaria_agricola",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "cosecha"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 25.5,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 15,
+        "plazo": "4 años",
+        "dias": 1460,
+        "am": "Alemán"
+      }
+    ]
+  },
+  {
+    "id": 59,
+    "nombre": "TOMAS HNOS Y CIA SA",
+    "cat": "semillas",
+    "subcat": "semillas_certificadas",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": false,
+    "tnaMin": 3.9,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.9,
+        "subsidio": 0,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.9,
+        "subsidio": 0,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 4.75,
+        "subsidio": 0,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 4.9,
+        "subsidio": 0,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      }
+    ]
+  },
+  {
+    "id": 60,
+    "nombre": "FEDEA SA",
+    "cat": "semillas",
+    "subcat": "semillas_certificadas",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": false,
+    "tnaMin": 3.9,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.9,
+        "subsidio": 0,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.9,
+        "subsidio": 0,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 4.75,
+        "subsidio": 0,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 4.9,
+        "subsidio": 0,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      }
+    ]
+  },
+  {
+    "id": 61,
+    "nombre": "GUAZZARONI GRECO SA",
+    "cat": "semillas",
+    "subcat": "semillas_certificadas",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 27.59,
+        "subsidio": 2,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 31.79,
+        "subsidio": 2,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 33.19,
+        "subsidio": 2,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 33.89,
+        "subsidio": 2,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 1,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 1.86,
+        "subsidio": 1,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.38,
+        "subsidio": 1,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.88,
+        "subsidio": 1,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      }
+    ]
+  },
+  {
+    "id": 62,
+    "nombre": "STOLLER ARGENTINA S.A.",
+    "cat": "proteccion_cultivos",
+    "subcat": "nutricion_bioestimulantes",
+    "ars": true,
+    "usd": true,
+    "tna0": false,
+    "sub": false,
+    "tnaMin": 3.9,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "desarrollo",
+      "proteccion"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.9,
+        "subsidio": 0,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 3.9,
+        "subsidio": 0,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 4.75,
+        "subsidio": 0,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 4.9,
+        "subsidio": 0,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      }
+    ]
+  },
+  {
+    "id": 63,
+    "nombre": "ATANOR SCA",
+    "cat": "fertilizantes",
+    "subcat": "nitrogeno",
+    "ars": true,
+    "usd": true,
+    "tna0": true,
+    "sub": true,
+    "tnaMin": 0,
+    "cultivos": [
+      "maiz",
+      "soja",
+      "trigo",
+      "girasol"
+    ],
+    "etapas": [
+      "pre_siembra",
+      "siembra",
+      "desarrollo"
+    ],
+    "subs": [
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "ARS",
+        "tna": 36,
+        "subsidio": 0,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 4.9,
+        "plazo": "90 días",
+        "dias": 90,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 4.9,
+        "plazo": "180 días",
+        "dias": 180,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 4.9,
+        "plazo": "270 días",
+        "dias": 270,
+        "am": "Bullet"
+      },
+      {
+        "mon": "USD",
+        "tna": 0,
+        "subsidio": 4.9,
+        "plazo": "360 días",
+        "dias": 360,
+        "am": "Bullet"
+      }
+    ]
+  }
+];
+
+
+// ╔═══════════════════════════════════════════════════════╗
+// ║  2. CONSTANTES, LOOKUPS Y ESTADO GLOBAL               ║
+// ╚═══════════════════════════════════════════════════════╝
+// ═══════════════════════════════════════════════════════
+// CONSTANTES, LOOKUPS Y ESTADO GLOBAL
+// ═══════════════════════════════════════════════════════
+
+// Pesos del scoring engine
+const W = {
+  cultivo: 0.30,
+  hist: 0.15,
+  etapa: 0.25,
+  tna: 0.12,
+  subsidio: 0.08,
+  especificidad: 0.10
+};
+
+// Calendario agronómico: mes → etapa por cultivo
+const CAL = {
+  maiz: {
+    7:'pre_siembra', 8:'pre_siembra',
+    9:'siembra', 10:'siembra',
+    11:'desarrollo', 12:'desarrollo',
+    1:'proteccion', 2:'proteccion',
+    3:'cosecha', 4:'cosecha',
+    5:'poscosecha', 6:'poscosecha'
+  },
+  soja: {
+    7:'pre_siembra', 8:'pre_siembra', 9:'pre_siembra',
+    10:'siembra', 11:'siembra',
+    12:'desarrollo',
+    1:'desarrollo', 2:'proteccion', 3:'proteccion',
+    4:'cosecha', 5:'cosecha',
+    6:'poscosecha'
+  },
+  trigo: {
+    4:'pre_siembra',
+    5:'siembra', 6:'siembra',
+    7:'desarrollo', 8:'desarrollo',
+    9:'proteccion', 10:'proteccion',
+    11:'cosecha', 12:'cosecha',
+    1:'poscosecha', 2:'poscosecha', 3:'poscosecha'
+  },
+  girasol: {
+    7:'pre_siembra', 8:'pre_siembra',
+    9:'siembra', 10:'siembra',
+    11:'desarrollo', 12:'desarrollo',
+    1:'proteccion',
+    2:'cosecha', 3:'cosecha',
+    4:'poscosecha', 5:'poscosecha', 6:'poscosecha'
+  },
+};
+
+// Normalización de nombres API → interno
+const CROP_MAP = {
+  'no detectable': null,
+  'maíz': 'maiz',
+  'maiz': 'maiz',
+  'corn': 'maiz',
+  'soja': 'soja',
+  'soy': 'soja',
+  'trigo': 'trigo',
+  'wheat': 'trigo',
+  'girasol': 'girasol',
+  'sunflower': 'girasol'
+};
+
+// Labels de display
+const CROP_LABEL = { maiz: 'Maíz', soja: 'Soja', trigo: 'Trigo', girasol: 'Girasol' };
+const CROP_EMOJI = { maiz: '🌽', soja: '🌱', trigo: '🌾', girasol: '🌻' };
+
+const ETAPA_LABEL = {
+  pre_siembra: 'Pre-siembra',
+  siembra: 'Siembra',
+  desarrollo: 'Desarrollo vegetativo',
+  proteccion: 'Manejo y protección',
+  cosecha: 'Cosecha',
+  poscosecha: 'Poscosecha',
+  general: 'Campaña'
+};
+
+const CAT_ICO = {
+  maquinaria: '#E5EFF8:#004481',
+  semillas: '#E2F5EC:#1B7A55',
+  fertilizantes: '#FEF3DE:#B86B00',
+  proteccion_cultivos: '#E0F5F5:#02A5A5',
+  financiamiento: '#E5EFF8:#1473B7'
+};
+
+const CAT_LABEL = {
+  maquinaria: 'Maquinaria',
+  semillas: 'Semillas',
+  fertilizantes: 'Fertilizantes',
+  proteccion_cultivos: 'Protección de cultivos',
+  financiamiento: 'Financiamiento'
+};
+
+const SUBCAT_LABEL = {
+  maquinaria_agricola: 'Maquinaria agrícola',
+  semillas_certificadas: 'Semillas certificadas',
+  herbicidas_fungicidas: 'Herbicidas y fungicidas',
+  nutricion_bioestimulantes: 'Nutrición y bioestimulantes',
+  nitrogeno: 'Fertilizantes nitrogenados',
+  prestamo_campana: 'Préstamo de campaña',
+  riego: 'Sistemas de riego',
+  tecnologia_precision: 'Tecnología de precisión',
+  pulverizacion: 'Pulverización',
+  cabezales_cosecha: 'Cabezales de cosecha'
+};
+
+// ── Contexto agronómico para explicaciones ──
+
+const ETAPA_CONTEXT = {
+  pre_siembra: 'El lote está en preparación para la siembra. Es el momento de asegurar semillas, fertilizantes de base y revisar maquinaria.',
+  siembra: 'El lote se encuentra en período de siembra activa. La prioridad es semillas, inoculantes y fertilizantes de arranque.',
+  desarrollo: 'El cultivo está en pleno crecimiento vegetativo. Las necesidades se concentran en fertilización nitrogenada y primeras aplicaciones fitosanitarias.',
+  proteccion: 'El cultivo está en la fase más crítica de protección sanitaria. Fungicidas, insecticidas y bioestimulantes son prioritarios.',
+  cosecha: 'El lote está próximo a cosecha. Las inversiones se orientan a maquinaria, logística y almacenamiento.',
+  poscosecha: 'El cultivo fue cosechado. Momento ideal para planificar la próxima campaña y evaluar inversiones de capital.',
+};
+
+const CAT_CONTEXT = {
+  proteccion_cultivos: {
+    maiz: 'El maíz en esta etapa es susceptible a roya, tizón y cogollero. Un programa fitosanitario oportuno protege el rendimiento potencial del lote.',
+    soja: 'La soja requiere control de mancha ojo de rana, roya asiática y chinches. La inversión en protección puede representar 3–5 qq/ha de diferencia.',
+    trigo: 'El trigo en espigazón es crítico para fusariosis y roya. El timing de la aplicación define el resultado final.',
+    girasol: 'El girasol en botón floral es muy sensible a Sclerotinia. La aplicación preventiva es determinante para el rendimiento.',
+    default: 'La protección de cultivos es la inversión de mayor retorno en esta etapa del ciclo productivo.',
+  },
+  semillas: {
+    maiz: 'Los híbridos de maíz con alto potencial requieren reserva anticipada. Asegurar cupo evita escasez y sobreprecios al momento de la siembra.',
+    soja: 'La elección del grupo de madurez y el tratamiento profesional de semillas definen el stand de plantas y el potencial del lote.',
+    trigo: 'La calidad de la semilla de trigo —sanidad y poder germinativo— es la base del rendimiento. Los lotes certificados garantizan densidad óptima.',
+    girasol: 'Los híbridos de girasol de alto oleico permiten diferenciar el precio final. La elección correcta según zona y fecha es crítica.',
+    default: 'La inversión en semilla de calidad es la que mejor retorno tiene por unidad de superficie en toda la campaña.',
+  },
+  fertilizantes: {
+    maiz: 'El maíz es el cultivo más demandante en nitrógeno. La dosis y fuente de N determinan directamente el techo de rendimiento.',
+    soja: 'La soja fija N atmosférico pero responde a fósforo y azufre. La fertilización completa mejora arranque y nodulación.',
+    trigo: 'El trigo es muy responsivo a N. El fraccionamiento siembra + macollaje maximiza la eficiencia de uso del nitrógeno.',
+    girasol: 'El girasol responde a fósforo y boro. La deficiencia de boro en floración impacta directamente la formación del capítulo.',
+    default: 'La fertilización eficiente es una de las inversiones de mayor retorno por hectárea en la producción extensiva.',
+  },
+  maquinaria: {
+    default: 'La inversión en maquinaria con financiamiento en USD a 4 años permite renovar el parque sin presionar el flujo de caja de la campaña.',
+    cosecha: 'Con la cosecha próxima, maquinaria propia o financiada reduce dependencia de contratistas y mejora la ventana operativa.',
+    pre_siembra: 'La siembra directa de calidad requiere sembradora en buen estado. Momento ideal para renovar antes de la campaña.',
+  },
+  financiamiento: {
+    default: 'El préstamo de campaña BBVA da flexibilidad para distribuir capital entre los distintos insumos según evolución de precios y necesidades.',
+  },
+};
+
+// ── Estado global de la aplicación ──
+
+const appState = {
+  polygon: null,
+  ha: 0,
+  detResult: null,
+  recoResult: null,
+  allScored: [],
+  activeCatFilter: 'all',
+  apiRaw: null,
+  histAnalysis: null
+};
+
+
+// ╔═══════════════════════════════════════════════════════╗
+// ║  3. SCORING ENGINE                                    ║
+// ╚═══════════════════════════════════════════════════════╝
+// ═══════════════════════════════════════════════════════
+// SCORING ENGINE
+// Depende de: catalog.js, data.js
+// ═══════════════════════════════════════════════════════
+
+function getCatCtx(cat, cultivo, etapa) {
+  const c = CAT_CONTEXT[cat];
+  if (!c) return '';
+  return c[etapa] || c[cultivo] || c.default || '';
+}
+
+function scoreConv(c, cultivo, conf, hist, etapa) {
+  const s_cult = c.cultivos.includes(cultivo) ? 1 : (c.cultivos.includes('general') ? 0.5 : 0);
+  const s_hist = hist[cultivo] || 0;
+  const s_etapa = c.etapas.includes(etapa) ? 1 : (c.etapas.includes('general') ? 0.5 : 0);
+  const tnaMin = c.tnaMin ?? 20;
+  const s_tna = Math.max(0, 1 - tnaMin / 40);
+  const s_sub = c.sub ? 1 : 0;
+  const genericas = ['maquinaria_agricola', 'prestamo_campana'];
+  const s_esp = genericas.includes(c.subcat) ? 0.5 : 1;
+
+  const raw = W.cultivo * s_cult
+    + W.hist * s_hist
+    + W.etapa * s_etapa
+    + W.tna * s_tna
+    + W.subsidio * s_sub
+    + W.especificidad * s_esp;
+
+  const fac = conf >= 0.70 ? 1 : conf >= 0.45 ? 0.7 : 0.4;
+  return Math.round(raw * fac * 1000) / 1000;
+}
+
+// ── Tier de recomendación (relativo al mejor score del lote) ──
+function scoreTier(sc, topScore) {
+  const ref = topScore || sc;
+  const ratio = ref > 0 ? sc / ref : 0;
+  if (ratio >= 0.90) return { label: 'Muy recomendado', color: '#1B7A55', bg: 'var(--gna)' };
+  if (ratio >= 0.70) return { label: 'Recomendado', color: '#1473B7', bg: 'var(--lb)' };
+  if (ratio >= 0.45) return { label: 'Buena opción', color: '#B86B00', bg: 'var(--ama)' };
+  return { label: 'Disponible', color: '#9E9E9E', bg: 'var(--g1)' };
+}
+
+// ── Recomendación del asesor (texto fluido, reemplaza bloques rígidos) ──
+function buildRecomendacion(c, cultivo, conf, etapa) {
+  const cL = CROP_LABEL[cultivo] || cultivo;
+  const eL = (ETAPA_LABEL[etapa] || etapa).toLowerCase();
+
+  // Apertura: situación del lote
+  let opening = '';
+  if (conf >= 0.70) {
+    opening = `Tu lote tiene <strong>${cL}</strong> en etapa de <strong>${eL}</strong>.`;
+  } else if (conf >= 0.45) {
+    opening = `Identificamos actividad consistente con <strong>${cL}</strong>, probablemente en <strong>${eL}</strong>.`;
+  } else {
+    opening = `Basándonos en la época del año, tu lote estaría transitando la etapa de <strong>${eL}</strong>.`;
+  }
+
+  // Contexto agronómico (por qué esta categoría importa ahora)
+  const catCtx = getCatCtx(c.cat, cultivo, etapa);
+
+  // Gancho financiero (por qué este convenio en particular)
+  let finHook = '';
+  if (c.tna0) {
+    finHook = `<strong>${c.nombre}</strong> te permite financiar esto a <strong>tasa 0% en dólares</strong> — cubrís el gasto sin costo financiero si cancelás en plazo.`;
+  } else if (c.sub) {
+    finHook = `Con <strong>${c.nombre}</strong>, BBVA subsidia parte de la tasa nominal, reduciendo el costo real del financiamiento.`;
+  } else {
+    finHook = `<strong>${c.nombre}</strong> ofrece una TNA desde ${c.tnaMin}%, competitiva para el segmento agropecuario.`;
+  }
+
+  // Combinar como párrafo fluido
+  let text = opening;
+  if (catCtx) text += ' ' + catCtx;
+  text += ' ' + finHook;
+  return text;
+}
+
+function buildRecomendacionGeneric(c) {
+  let situacion = '';
+  if (c.cat === 'financiamiento') {
+    situacion = 'Aunque no identificamos un cultivo específico en este momento, es un buen momento para evaluar financiamiento para la próxima campaña.';
+  } else if (c.cat === 'maquinaria') {
+    situacion = 'La inversión en maquinaria con financiamiento a largo plazo es una oportunidad que no depende del cultivo actual.';
+  } else {
+    situacion = `Aunque no identificamos un cultivo específico, <strong>${c.nombre}</strong> ofrece condiciones abiertas a cualquier producción.`;
+  }
+
+  let finHook = '';
+  if (c.tna0) {
+    finHook = `Este convenio tiene <strong>tasa 0% en dólares</strong>, ideal para planificar la próxima campaña sin costo financiero.`;
+  } else if (c.sub) {
+    finHook = `BBVA subsidia parte de la tasa con este proveedor, reduciendo el costo efectivo del crédito.`;
+  } else {
+    finHook = `La TNA parte desde ${c.tnaMin}%.`;
+  }
+
+  return situacion + ' ' + finHook;
+}
+
+// ── Texto corto para tarjetas (tono de asesor) ──
+function buildShort(c, cultivo, etapa) {
+  const eL = (ETAPA_LABEL[etapa] || etapa).toLowerCase();
+  if (c.tna0) return `Oportunidad: tasa 0% en dólares para la ${eL}.`;
+  if (c.sub) return `Tasa subsidiada por BBVA, ideal para la ${eL}.`;
+  return `Financiamiento desde ${c.tnaMin}% TNA para la ${eL}.`;
+}
+
+function buildShortGeneric(c) {
+  if (c.tna0) return `Tasa 0% en dólares disponible para cualquier campaña.`;
+  if (c.sub) return `Oportunidad: tasa subsidiada por BBVA.`;
+  return `Financiamiento disponible desde ${c.tnaMin}% TNA.`;
+}
+
+// ── Mock crop history with rotation ──
+function mockHist(cultivo) {
+  const rotaciones = {
+    maiz: { maiz: 0.6, soja: 0.3, trigo: 0.1 },
+    soja: { soja: 0.5, maiz: 0.3, trigo: 0.15, girasol: 0.05 },
+    trigo: { trigo: 0.4, soja: 0.35, maiz: 0.2, girasol: 0.05 },
+    girasol: { girasol: 0.4, soja: 0.3, trigo: 0.2, maiz: 0.1 }
+  };
+  return rotaciones[cultivo] || { [cultivo]: 1 };
+}
+
+function scoreAll(cultivo, conf) {
+  const mes = new Date().getMonth() + 1;
+  const etapa = cultivo ? (CAL[cultivo] || {})[mes] || 'general' : 'general';
+  const hist = cultivo ? mockHist(cultivo) : {};
+
+  const scored = CATALOG.map(c => ({
+    ...c,
+    score: cultivo ? scoreConv(c, cultivo, conf, hist, etapa) : scoreGeneric(c, mes),
+    expl_short: cultivo ? buildShort(c, cultivo, etapa) : buildShortGeneric(c),
+    recomendacion: cultivo ? buildRecomendacion(c, cultivo, conf, etapa) : buildRecomendacionGeneric(c)
+  }));
+
+  scored.sort((a, b) => b.score - a.score);
+
+  const cats = {};
+  const res = [];
+  for (const c of scored) {
+    const max = c.cat === 'maquinaria' ? 3 : 2;
+    if ((cats[c.cat] || 0) < max) {
+      res.push(c);
+      cats[c.cat] = (cats[c.cat] || 0) + 1;
+    }
+    if (res.length >= 10) break;
+  }
+
+  return { etapa, mes, top: res, allScored: scored, noCrop: !cultivo };
+}
+
+// Generic scoring when no crop detected — weight financial conditions more
+function scoreGeneric(c, mes) {
+  const s_tna = Math.max(0, 1 - (c.tnaMin ?? 20) / 40);
+  const s_sub = c.sub ? 1 : 0;
+  const universal = ['financiamiento', 'maquinaria'].includes(c.cat) ? 1 : 0.5;
+  return Math.round((0.40 * s_tna + 0.30 * s_sub + 0.30 * universal) * 1000) / 1000;
+}
+
+function buildShortGeneric(c) {
+  if (c.tna0) return `Financiamiento con tasa 0% USD disponible.`;
+  if (c.sub) return `Tasa subsidiada por BBVA — aplica a cualquier cultivo.`;
+  return `TNA desde ${c.tnaMin}% — financiamiento general.`;
+}
+
+function buildExplGeneric(c) {
+  return buildRecomendacionGeneric(c);
+}
+
+
+// ╔═══════════════════════════════════════════════════════╗
+// ║  4. API BOLD (OAuth, detección, parseo, mock)         ║
+// ╚═══════════════════════════════════════════════════════╝
+// ═══════════════════════════════════════════════════════
+// API BOLD — OAuth2, Crop Detection, Parseo, Mock
+// Depende de: data.js (CROP_MAP)
+// ═══════════════════════════════════════════════════════
+
+const API_BASE = 'https://api.bold-agro.ai';
+let tokenCache = { token: null, exp: 0 };
+
+async function getToken() {
+  if (tokenCache.token && Date.now() < tokenCache.exp) return tokenCache.token;
+
+  const usr = document.getElementById('cfg-client').value;
+  const pwd = document.getElementById('cfg-secret').value;
+  if (!usr || !pwd) throw new Error('Sin credenciales');
+
+  const env = document.getElementById('cfg-env').value;
+  const basic = btoa(usr + ':' + pwd);
+
+  const r = await fetch(`${API_BASE}/${env}/v1/oauth2/token?grant_type=client_credentials`, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Basic ' + basic,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+  });
+
+  if (!r.ok) throw new Error(`Auth ${r.status}`);
+  const d = await r.json();
+  tokenCache = { token: d.access_token || d.token, exp: Date.now() + (d.expires_in || 3600) * 1000 };
+  return tokenCache.token;
+}
+
+async function callBold(path, body) {
+  const tk = await getToken();
+  const env = document.getElementById('cfg-env').value;
+  const r = await fetch(`${API_BASE}/${env}/${path}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + tk,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error(`API ${path} → ${r.status}`);
+  return r.json();
+}
+
+// Parse API response preserving ALL data including "no detectable"
+function parseDetsRaw(resp) {
+  const dets = resp.detections || [resp];
+  const raw = [];
+  for (const det of dets) {
+    for (const c of (det.crops || [])) {
+      raw.push({ name: c.name, value: c.value || 0, year: det.year, month: det.month });
+    }
+  }
+  return raw;
+}
+
+// Extract only actionable crops (for scoring)
+function parseDets(resp) {
+  const res = [];
+  const dets = resp.detections || [resp];
+  for (const det of dets) {
+    const allCrops = det.crops || [];
+    const totalDetectable = allCrops.reduce((a, c) => a + (c.value || 0), 0);
+    for (const c of allCrops) {
+      const key = c.name?.toLowerCase();
+      const cult = CROP_MAP[key];
+      if (cult && (c.value || 0) > 0) {
+        res.push({
+          cultivo: cult,
+          ha: c.value,
+          pct: totalDetectable > 0 ? (c.value / totalDetectable) : 0,
+          year: det.year,
+          month: det.month
+        });
+      }
+    }
+  }
+  return res;
+}
+
+// Get main crop — returns null if nothing detected
+function getCultivoActual(dets) {
+  if (!dets.length) return null;
+  dets.sort((a, b) => b.pct - a.pct);
+  return { cultivo: dets[0].cultivo, conf: Math.min(dets[0].pct, 1), ha: dets[0].ha };
+}
+
+// Mock only for when API is unreachable (CORS) — clearly marked
+function mockDetect(coords) {
+  return { cultivo: null, conf: 0, ha: 0, isMock: true };
+}
+
+// ── Hist analysis for agrofinance summary ──
+function analyzeHist(histRaw) {
+  if (!histRaw || !histRaw.length) return null;
+
+  // Group by campaign (year)
+  const campaigns = {};
+  histRaw.forEach(d => {
+    const key = `${d.year}`;
+    if (!campaigns[key]) campaigns[key] = [];
+    campaigns[key].push(d);
+  });
+
+  // Find dominant crop per campaign
+  const campCrops = [];
+  for (const [yr, crops] of Object.entries(campaigns).sort((a, b) => a[0] - b[0])) {
+    const actionable = crops.filter(c => CROP_MAP[c.name?.toLowerCase()]);
+    if (actionable.length) {
+      actionable.sort((a, b) => b.value - a.value);
+      campCrops.push({ year: parseInt(yr), crop: actionable[0].name, ha: actionable[0].value });
+    }
+  }
+
+  // Rotation check: ≥2 different crops across campaigns
+  const uniqueCrops = new Set(campCrops.map(c => c.crop?.toLowerCase()));
+  const hasRotation = uniqueCrops.size >= 2 && campCrops.length >= 2;
+
+  // No deforestation: if ≥3 campaigns with crops, lote has agricultural history
+  const noDeforestation = campCrops.length >= 3;
+
+  return {
+    campaigns: campCrops,
+    uniqueCrops: [...uniqueCrops],
+    hasRotation,
+    noDeforestation,
+    totalCampaigns: campCrops.length
+  };
+}
+
+
+// ╔═══════════════════════════════════════════════════════╗
+// ║  5. MAPA LEAFLET (init, capas, dibujo, geoloc)       ║
+// ╚═══════════════════════════════════════════════════════╝
+// ═══════════════════════════════════════════════════════
+// MAPA LEAFLET — Init, capas, dibujo, búsqueda de localidad
+// Depende de: data.js (appState), Leaflet + Leaflet.Draw
+// ═══════════════════════════════════════════════════════
+
+let map, drawLayer, drawnItems, osmLayer, satLayer;
+
+function initMap() {
+  map = L.map('map', { center: [-33.3, -61.5], zoom: 7, zoomControl: false });
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+  osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© OSM'
+  });
+  satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19, attribution: '© Esri'
+  });
+  osmLayer.addTo(map);
+
+  drawnItems = new L.FeatureGroup();
+  map.addLayer(drawnItems);
+
+  drawLayer = new L.Control.Draw({
+    edit: { featureGroup: drawnItems },
+    draw: {
+      polyline: false, rectangle: false, circle: false,
+      circlemarker: false, marker: false,
+      polygon: { shapeOptions: { color: '#02A5A5', weight: 2, fillOpacity: 0.15 } }
+    }
+  });
+  map.addControl(drawLayer);
+
+  map.on(L.Draw.Event.CREATED, e => {
+    drawnItems.clearLayers();
+    drawnItems.addLayer(e.layer);
+    onPolygon(e.layer);
+  });
+
+  map.on(L.Draw.Event.DELETED, () => {
+    appState.polygon = null;
+    appState.ha = 0;
+    document.getElementById('ha-disp').style.display = 'none';
+    document.getElementById('btn-consultar').disabled = true;
+  });
+}
+
+function setLayer(l) {
+  if (l === 'sat') {
+    map.removeLayer(osmLayer);
+    satLayer.addTo(map);
+    document.getElementById('btn-sat').classList.add('active');
+    document.getElementById('btn-osm').classList.remove('active');
+  } else {
+    map.removeLayer(satLayer);
+    osmLayer.addTo(map);
+    document.getElementById('btn-osm').classList.add('active');
+    document.getElementById('btn-sat').classList.remove('active');
+  }
+}
+
+function calcHa(ll) {
+  const coords = ll.map(c => [c.lng * Math.PI / 180, c.lat * Math.PI / 180]);
+  coords.push(coords[0]);
+  let area = 0;
+  const R = 6371000;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const [l1, p1] = coords[i];
+    const [l2, p2] = coords[i + 1];
+    area += (l2 - l1) * (2 + Math.sin(p1) + Math.sin(p2));
+  }
+  return Math.abs(area * R * R / 2) / 10000;
+}
+
+function onPolygon(layer) {
+  const ll = layer.getLatLngs()[0];
+  const ha = calcHa(ll);
+  appState.ha = ha;
+  appState.polygon = ll.map(c => [c.lng, c.lat]);
+  document.getElementById('ha-disp').textContent = `${ha.toFixed(1)} ha`;
+  document.getElementById('ha-disp').style.display = 'block';
+  document.getElementById('btn-consultar').disabled = false;
+}
+
+// ── Búsqueda de localidad — Nominatim autocomplete ──
+
+let locTimer = null;
+
+function debounceLoc() {
+  clearTimeout(locTimer);
+  const q = document.getElementById('loc-input').value.trim();
+  if (q.length < 3) {
+    document.getElementById('loc-results').classList.remove('show');
+    return;
+  }
+  locTimer = setTimeout(() => searchLoc(), 350);
+}
+
+async function searchLoc() {
+  const q = document.getElementById('loc-input').value.trim();
+  if (!q) return;
+  const resultsDiv = document.getElementById('loc-results');
+
+  // Coordenadas directas
+  const coordMatch = q.match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
+  if (coordMatch) {
+    const lat = parseFloat(coordMatch[1]);
+    const lng = parseFloat(coordMatch[2]);
+    map.setView([lat, lng], 14);
+    resultsDiv.classList.remove('show');
+    document.getElementById('loc-input').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    return;
+  }
+
+  try {
+    const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + ' Argentina')}&limit=6&countrycodes=ar`);
+    const data = await resp.json();
+    if (!data.length) {
+      resultsDiv.innerHTML = '<div class="loc-item" style="color:var(--g4);">Sin resultados</div>';
+      resultsDiv.classList.add('show');
+      return;
+    }
+    resultsDiv.innerHTML = data.map(r => {
+      const parts = r.display_name.split(',');
+      const main = parts[0];
+      const sub = parts.slice(1, 3).join(',').trim();
+      return `<div class="loc-item" onclick="goToLoc(${r.lat},${r.lon},this)" data-name="${main}" data-prov="${(parts[parts.length - 3] || '').trim()}"><b>${main}</b><br><span style="color:var(--g4)">${sub}</span></div>`;
+    }).join('');
+    resultsDiv.classList.add('show');
+  } catch (e) {
+    resultsDiv.innerHTML = '<div class="loc-item" style="color:var(--g4);">Error de búsqueda</div>';
+    resultsDiv.classList.add('show');
+  }
+}
+
+function goToLoc(lat, lng, el) {
+  map.setView([lat, lng], 14);
+  document.getElementById('loc-results').classList.remove('show');
+  const name = el.dataset.name || '';
+  const prov = el.dataset.prov || '';
+  document.getElementById('loc-input').value = name;
+  if (!document.getElementById('inp-loc').value && name) document.getElementById('inp-loc').value = name;
+  if (!document.getElementById('inp-prov').value && prov) document.getElementById('inp-prov').value = prov;
+}
+
+// Cerrar dropdown al clickear fuera
+document.addEventListener('click', e => {
+  if (!e.target.closest('.loc-search')) document.getElementById('loc-results')?.classList.remove('show');
+});
+
+
+// ╔═══════════════════════════════════════════════════════╗
+// ║  6. RENDERING UI (recomendaciones, lista, detalle)    ║
+// ╚═══════════════════════════════════════════════════════╝
+// ═══════════════════════════════════════════════════════
+// RENDERING UI — Recomendaciones, lista, detalle
+// Depende de: data.js, scoring.js, api.js
+// ═══════════════════════════════════════════════════════
+
+function icoStyle(cat) {
+  const p = (CAT_ICO[cat] || '#F2F2F2:#555').split(':');
+  return `background:${p[0]};color:${p[1]}`;
+}
+
+function icoInits(n) {
+  const w = n.trim().split(' ');
+  return w.length === 1 ? w[0].slice(0, 2).toUpperCase() : (w[0][0] + w[1][0]).toUpperCase();
+}
+
+// ── Pantalla principal de recomendaciones ──
+
+function showReco() {
+  const det = appState.detResult;
+  const cultivo = det?.cultivo;
+  const conf = det?.conf || 0;
+  const { etapa, top, noCrop } = appState.recoResult;
+  const histA = appState.histAnalysis;
+  const lnombre = document.getElementById('inp-nombre').value || 'Sin nombre';
+
+  // ── Header ──
+  if (cultivo) {
+    document.getElementById('reco-title').textContent = `${CROP_EMOJI[cultivo] || ''} ${CROP_LABEL[cultivo] || cultivo} — ${lnombre}`;
+    document.getElementById('crop-tag').textContent = CROP_LABEL[cultivo] || cultivo;
+    document.getElementById('etapa-tag').textContent = ETAPA_LABEL[etapa] || etapa;
+  } else {
+    document.getElementById('reco-title').textContent = `📊 ${lnombre} — Sin cultivo detectado`;
+    document.getElementById('crop-tag').textContent = 'Sin cultivo';
+    document.getElementById('etapa-tag').textContent = 'General';
+  }
+
+  const locParts = [document.getElementById('inp-loc').value, document.getElementById('inp-prov').value].filter(Boolean).join(', ');
+  document.getElementById('reco-sub').textContent =
+    `${(appState.ha || 0).toFixed(0)} ha${locParts ? ' · ' + locParts : ''}`;
+  document.getElementById('n-tag').textContent = `${top.length} convenios recomendados`;
+
+  // ── API raw response display (deshabilitado) ──
+  let apiRawHtml = '';
+
+  // ── Hist summary panel + green badge ──
+  let histHtml = '';
+  if (histA && histA.campaigns.length) {
+    const timeline = histA.campaigns.map(c => {
+      const emoji = CROP_EMOJI[CROP_MAP[c.crop?.toLowerCase()]] || '🌿';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:.5px solid var(--g2);">
+        <span style="font-size:11px;font-weight:700;color:var(--g4);min-width:40px;">${c.year}</span>
+        <span style="font-size:14px;">${emoji}</span>
+        <span style="font-size:12px;font-weight:600;color:var(--g9);">${c.crop}</span>
+        <span style="font-size:11px;color:var(--g4);margin-left:auto;">${c.ha?.toFixed(0)} ha</span>
+      </div>`;
+    }).join('');
+
+    // Green badge
+    let badge = '';
+    if (histA.noDeforestation) {
+      badge = `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:12px;margin-top:10px;">
+        <span style="font-size:20px;">🌿</span>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#2E7D32;">Lote con uso agrícola histórico verificado</div>
+          <div style="font-size:11px;color:#558B2F;line-height:1.4;">${histA.totalCampaigns} campañas registradas${histA.hasRotation ? ` con rotación de cultivos (${histA.uniqueCrops.map(c => (CROP_LABEL[CROP_MAP[c?.toLowerCase()]] || c)).join(', ')}). La rotación es un indicador de manejo sustentable y preservación del suelo.` : '.'}${histA.noDeforestation ? ' Este lote no presenta indicios de deforestación reciente.' : ''}</div>
+        </div>
+      </div>`;
+    } else if (histA.hasRotation) {
+      badge = `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:12px;margin-top:10px;">
+        <span style="font-size:20px;">🔄</span>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#2E7D32;">Rotación de cultivos detectada</div>
+          <div style="font-size:11px;color:#558B2F;">Cultivos registrados: ${histA.uniqueCrops.map(c => (CROP_LABEL[CROP_MAP[c?.toLowerCase()]] || c)).join(', ')}. La diversificación productiva reduce el riesgo crediticio.</div>
+        </div>
+      </div>`;
+    }
+
+    // Agrofinance insight
+    let insight = '';
+    if (histA.hasRotation) {
+      insight = `<div style="font-size:12px;color:var(--g6);line-height:1.5;margin-top:8px;padding:10px 12px;background:var(--lb);border-radius:10px;">
+        <strong style="color:var(--nv);">Perfil agrofinanciero:</strong> Este lote muestra ${histA.totalCampaigns} campañas con ${histA.uniqueCrops.length} cultivos diferentes. La rotación ${histA.uniqueCrops.map(c => (CROP_LABEL[CROP_MAP[c?.toLowerCase()]] || c)).join(' → ')} es consistente con un esquema de producción sustentable. Desde el punto de vista crediticio, la diversificación de cultivos reduce la exposición a riesgos climáticos y de mercado concentrados en un solo commodity.
+      </div>`;
+    } else if (histA.totalCampaigns >= 2) {
+      const mainCrop = histA.campaigns[histA.campaigns.length - 1]?.crop;
+      insight = `<div style="font-size:12px;color:var(--g6);line-height:1.5;margin-top:8px;padding:10px 12px;background:var(--lb);border-radius:10px;">
+        <strong style="color:var(--nv);">Perfil agrofinanciero:</strong> Este lote muestra continuidad productiva en ${mainCrop} durante ${histA.totalCampaigns} campañas. La especialización indica inversión estructural en el cultivo, lo que puede favorecer el acceso a convenios específicos de la cadena.
+      </div>`;
+    }
+
+    histHtml = `<div style="padding:12px 16px;background:var(--w);border-bottom:.5px solid var(--g2);">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--g4);margin-bottom:6px;">Historial del lote · Crop Detection Hist</div>
+      <div style="background:var(--g1);border-radius:12px;padding:10px 14px;">${timeline}</div>
+      ${badge}${insight}
+    </div>`;
+  }
+
+  // ── Summary stats ──
+  const tasa0 = top.filter(c => c.tna0).length;
+  const subsi = top.filter(c => c.sub).length;
+  const catSet = new Set(top.map(c => c.cat));
+  document.getElementById('reco-summary').innerHTML = apiRawHtml + histHtml + `
+    <div style="display:flex;gap:12px;padding:10px 16px;overflow-x:auto;">
+      <div class="reco-stat"><div class="reco-stat-n">${top.length}</div><div class="reco-stat-l">convenios<br>seleccionados</div></div>
+      <div class="reco-stat"><div class="reco-stat-n">${catSet.size}</div><div class="reco-stat-l">categorías<br>representadas</div></div>
+      <div class="reco-stat"><div class="reco-stat-n" style="color:var(--gn)">${tasa0}</div><div class="reco-stat-l">con tasa<br>0% USD</div></div>
+      <div class="reco-stat"><div class="reco-stat-n" style="color:var(--am)">${subsi}</div><div class="reco-stat-l">con tasa<br>subsidiada</div></div>
+    </div>`;
+
+  // ── Category filter chips ──
+  const catCounts = {};
+  top.forEach(c => { catCounts[c.cat] = (catCounts[c.cat] || 0) + 1; });
+  let chips = `<div class="cat-chip active" data-cat="all" onclick="filterCat('all')">Todos <span class="chip-count">(${top.length})</span></div>`;
+  for (const [cat, count] of Object.entries(catCounts)) {
+    chips += `<div class="cat-chip" data-cat="${cat}" onclick="filterCat('${cat}')">${CAT_LABEL[cat] || cat} <span class="chip-count">(${count})</span></div>`;
+  }
+  document.getElementById('cat-bar').innerHTML = chips;
+  appState.activeCatFilter = 'all';
+
+  renderList(top);
+
+  // Auto-seleccionar el convenio más recomendado
+  if (top.length) {
+    const firstCard = document.querySelector('.ccard');
+    if (firstCard) firstCard.classList.add('selected');
+    showDetalle(top[0], 0);
+  }
+
+  showTab('reco');
+}
+
+// ── Filtro por categoría ──
+
+function filterCat(cat) {
+  appState.activeCatFilter = cat;
+  document.querySelectorAll('.cat-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.cat === cat);
+  });
+  const filtered = cat === 'all'
+    ? appState.recoResult.top
+    : appState.recoResult.top.filter(c => c.cat === cat);
+  renderList(filtered);
+}
+
+// ── Lista de convenios ──
+
+function renderList(items) {
+  const list = document.getElementById('reco-list');
+  list.innerHTML = '';
+  const topScore = appState.recoResult?.top?.[0]?.score || 1;
+
+  items.forEach((c, i) => {
+    const tier = scoreTier(c.score, topScore);
+
+    const tags = [];
+    if (c.tna0) tags.push('<span class="tpill tg">Tasa 0% USD</span>');
+    if (c.sub && !c.tna0) tags.push('<span class="tpill tg">Subsidiado BBVA</span>');
+    if (c.usd && !c.tna0) tags.push('<span class="tpill tb">USD disponible</span>');
+    if (!c.ars && c.usd) tags.push('<span class="tpill tb">Solo USD</span>');
+    if (c.subcat !== 'maquinaria_agricola' && c.subcat !== 'prestamo_campana' && c.subcat !== 'semillas_certificadas')
+      tags.push(`<span class="tpill ta">${SUBCAT_LABEL[c.subcat] || c.subcat}</span>`);
+
+    const div = document.createElement('div');
+    div.className = 'ccard';
+    div.dataset.idx = i;
+    div.innerHTML = `
+      <div class="ctop">
+        <div class="cico" style="${icoStyle(c.cat)}">${icoInits(c.nombre)}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="cnm">${c.nombre}</div>
+          <div class="cct">${CAT_LABEL[c.cat] || c.cat} · ${SUBCAT_LABEL[c.subcat] || c.subcat}</div>
+        </div>
+        <span style="font-size:11px;font-weight:700;color:${tier.color};background:${tier.bg};padding:3px 10px;border-radius:8px;white-space:nowrap;">${tier.label}</span>
+      </div>
+      <div class="ctgs">${tags.join('')}</div>
+      <div class="cex">${c.expl_short}</div>
+    `;
+    div.onclick = () => {
+      document.querySelectorAll('.ccard').forEach(d => d.classList.remove('selected'));
+      div.classList.add('selected');
+      showDetalle(c, i);
+    };
+    list.appendChild(div);
+  });
+}
+
+// ── Detalle de un convenio ──
+
+function showDetalle(c, idx) {
+  const { etapa } = appState.recoResult;
+  const tnaMin = c.tnaMin;
+  const maxPlazo = c.subs.reduce((a, b) => Math.max(a, b.dias || 0), 0);
+  const maxPlazoLabel = c.subs.find(s => s.dias === maxPlazo)?.plazo || '–';
+  const maxSub = c.subs.reduce((a, b) => Math.max(a, b.subsidio || 0), 0);
+  const topScore = appState.recoResult?.top?.[0]?.score || 1;
+  const tier = scoreTier(c.score, topScore);
+
+  // Build recommendation text
+  const det = appState.detResult || {};
+  const cultivo = det.cultivo;
+  const conf = det.conf || 0;
+  const recoText = c.recomendacion || (cultivo ? buildRecomendacion(c, cultivo, conf, etapa) : buildRecomendacionGeneric(c));
+
+  document.getElementById('det-wrap').innerHTML = `
+    <div class="det-card">
+      <div class="det-card-hdr">
+        <div class="det-hero">
+          <div class="det-ico" style="${icoStyle(c.cat)}">${icoInits(c.nombre)}</div>
+          <div>
+            <div class="det-nm">${c.nombre}</div>
+            <div class="det-cat">${CAT_LABEL[c.cat] || c.cat} · ${SUBCAT_LABEL[c.subcat] || c.subcat}</div>
+          </div>
+          <div class="det-sc">
+            <div class="det-scv" style="color:${tier.color}">${tier.label}</div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:16px 20px;">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--g4);margin-bottom:8px;">Recomendación del asesor</div>
+        <div style="font-size:14px;line-height:1.65;color:var(--g9);background:var(--g1);border-radius:12px;padding:16px 18px;">${recoText}</div>
+      </div>
+      <div class="det-sec">Condiciones disponibles</div>
+      <div class="cgrid">
+        <div class="cbox"><div class="clbl">TNA mínima</div><div class="cv ${tnaMin === 0 ? 'cv-y' : ''}">${tnaMin === 0 ? '0 %' : (tnaMin ?? '–') + '%'}</div></div>
+        <div class="cbox"><div class="clbl">Tasa cero USD</div><div class="cv ${c.tna0 ? 'cv-y' : ''}">${c.tna0 ? 'Sí' : 'No'}</div></div>
+        <div class="cbox"><div class="clbl">Plazo máximo</div><div class="cv">${maxPlazoLabel}</div></div>
+        <div class="cbox"><div class="clbl">Subsidio máx.</div><div class="cv">${maxSub ? maxSub + ' pts' : '–'}</div></div>
+      </div>
+      <div class="det-sec">Sub-productos</div>
+      <div class="subs-wrap">
+        ${c.subs.map(s => `
+          <div class="sub-row">
+            <div class="smon ${s.mon === 'USD' ? 'susd' : 'sars'}">${s.mon}</div>
+            <div class="sinf">
+              <div class="sds">${CAT_LABEL[c.cat] || c.cat} ${s.mon}</div>
+              <div class="spl">${s.plazo}${s.am ? ' · ' + s.am : ''}</div>
+            </div>
+            <div class="stna-col">
+              <div class="stnav ${s.tna === 0 ? 'stnav-z' : ''}">${s.tna === 0 ? '0%' : s.tna + '%'}</div>
+              <div class="stnal">TNA</div>
+              ${s.subsidio ? `<div class="ssub">-${s.subsidio} pts sub.</div>` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    <button class="cta-p" style="margin-bottom:10px;" onclick="showModal()">Contactar ejecutivo BBVA</button>
+    <button class="cta-s">Compartir análisis</button>
+  `;
+}
+
+
+// ╔═══════════════════════════════════════════════════════╗
+// ║  7. APP (flujo principal, navegación, config, init)   ║
+// ╚═══════════════════════════════════════════════════════╝
+// ═══════════════════════════════════════════════════════
+// APP — Flujo principal, navegación, config, modal, init
+// Depende de: todos los demás módulos
+// ═══════════════════════════════════════════════════════
+
+// ── Navegación entre pantallas ──
+
+function showTab(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('scr-' + id).classList.add('active');
+  if (id === 'main' && map) setTimeout(() => map.invalidateSize(), 100);
+}
+
+// ── Flujo principal de consulta ──
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function consultar() {
+  showTab('loading');
+  const dots = [0, 1, 2, 3].map(i => document.getElementById('dot' + i));
+  const txs = [0, 1, 2, 3].map(i => document.getElementById('tx' + i));
+  const step = (i) => {
+    dots[i].className = 'lsdot done';
+    txs[i].className = 'lstx done';
+    if (dots[i + 1]) { dots[i + 1].className = 'lsdot run'; }
+  };
+
+  let useApi = false;
+  try {
+    const cid = document.getElementById('cfg-client').value;
+    if (cid) { await getToken(); useApi = true; }
+  } catch (e) { useApi = false; }
+
+  await delay(600); step(0);
+
+  const coords = appState.polygon.concat([appState.polygon[0]]);
+  const geometry = { type: 'Polygon', coordinates: [coords] };
+  const now = new Date();
+  const custId = '4810d23c-5623-4958-befb-4bfdd5ba44a3';
+
+  // ── Step 1: Crop Detection (for recommendation) ──
+  let detResult = null;
+  let apiRaw = null;
+  if (useApi) {
+    try {
+      const cropBody = {
+        geometry,
+        year: now.getFullYear(),
+        month: now.getMonth() + 1,
+        customerId: custId,
+        surface: Math.round(appState.ha) || null
+      };
+      const resp = await callBold('v2/cropdetection', cropBody);
+      apiRaw = parseDetsRaw(resp);
+      detResult = getCultivoActual(parseDets(resp));
+    } catch (e) {
+      console.warn('Crop Detection failed:', e);
+      detResult = mockDetect(appState.polygon);
+    }
+  } else {
+    detResult = mockDetect(appState.polygon);
+  }
+  await delay(800); step(1);
+  appState.detResult = detResult || { cultivo: null, conf: 0, ha: 0 };
+  appState.apiRaw = apiRaw;
+
+  // ── Step 2: Crop Detection Hist (for agrofinance summary, NOT for scoring) ──
+  let histAnalysis = null;
+  if (useApi) {
+    try {
+      const histBody = { geometry, customerId: custId, surface: null };
+      const histResp = await callBold('v2/cropdetection-hist', histBody);
+      const histRaw = parseDetsRaw(histResp);
+      histAnalysis = analyzeHist(histRaw);
+    } catch (e) {
+      console.warn('Crop Detection Hist failed:', e);
+    }
+  }
+  await delay(600); step(2);
+  appState.histAnalysis = histAnalysis;
+
+  // ── Step 3: Score convenios (based on crop detection only) ──
+  const cultivo = appState.detResult.cultivo;
+  const conf = appState.detResult.conf || 0;
+  const reco = scoreAll(cultivo, conf);
+  appState.recoResult = reco;
+  appState.allScored = reco.allScored;
+  await delay(500); step(3);
+
+  await delay(400);
+  showReco();
+}
+
+// ── Config / Test API ──
+
+async function testApi() {
+  const al = document.getElementById('alert-cfg');
+  al.className = 'alert alert-warn';
+  al.style.display = 'block';
+  al.textContent = 'Verificando conexión…';
+  try {
+    tokenCache = { token: null, exp: 0 };
+    await getToken();
+    al.className = 'alert alert-ok';
+    al.textContent = 'Conexión exitosa. Token obtenido correctamente.';
+    document.getElementById('api-status').textContent = 'API REAL';
+    document.getElementById('api-status').className = 'api-status ok';
+    document.getElementById('cfg-state').textContent = `Conectado · Ambiente: ${document.getElementById('cfg-env').value} · Token válido.`;
+    document.getElementById('alert-api').style.display = 'none';
+  } catch (e) {
+    al.className = 'alert alert-err';
+    al.textContent = `Error: ${e.message}. Si es CORS, la API no acepta requests directos del browser.`;
+    document.getElementById('api-status').textContent = 'MOCK';
+    document.getElementById('api-status').className = 'api-status mock';
+  }
+}
+
+// ── Modal ──
+
+function showModal() {
+  document.getElementById('modal-bg').classList.add('show');
+}
+
+function hideModal(e) {
+  if (!e || e.target === document.getElementById('modal-bg'))
+    document.getElementById('modal-bg').classList.remove('show');
+}
+
+// ── Init ──
+
+initMap();
+
+</script>
+</body>
+</html>
