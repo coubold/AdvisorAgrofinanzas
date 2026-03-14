@@ -2,48 +2,44 @@
 
 Asistente de AgroFinanzas — prototipo con sensorización Bold y convenios BBVA.
 
-## Deploy en GitHub Pages (5 minutos)
-
-### Paso 1: Crear el repo
-
-1. Andá a [github.com/new](https://github.com/new)
-2. Nombre: `agroadvisor` (o el que quieras)
-3. Dejalo **público**
-4. **NO** marques "Add a README" (ya tenemos uno)
-5. Click **Create repository**
-
-### Paso 2: Subir los archivos
-
-En la página del repo vacío, clickeá **"uploading an existing file"** y arrastrá estos dos archivos:
-
-- `index.html`
-- `README.md`
-
-Click **Commit changes**.
-
-### Paso 3: Activar GitHub Pages
-
-1. En el repo, andá a **Settings** → **Pages** (menú lateral)
-2. En **Source**, elegí **Deploy from a branch**
-3. En **Branch**, elegí `main` y carpeta `/ (root)`
-4. Click **Save**
-
-### Paso 4: Esperar 1-2 minutos
-
-GitHub Pages tarda un poco la primera vez. Tu URL va a ser:
+## Estructura
 
 ```
-https://TU-USUARIO.github.io/agroadvisor/
+index.html      ← HTML + layout (222 lín)
+styles.css      ← Estilos (224 lín)
+catalog.js      ← 57 merchants BBVA formateados (2699 lín)
+data.js         ← Constantes, lookups, estado global (163 lín)
+scoring.js      ← Motor de scoring y recomendaciones (189 lín)
+api.js          ← OAuth Bold, parseo, mock (158 lín)
+map.js          ← Leaflet, capas, dibujo, geoloc (149 lín)
+ui.js           ← Rendering de resultados y detalle (266 lín)
+app.js          ← Flujo principal, navegación, init (132 lín)
 ```
 
-Abrí esa URL desde el celu y listo.
+## Deploy en GitHub Pages
 
-### Actualizar después
+### Repo nuevo
 
-Cada vez que quieras actualizar, subí el `index.html` nuevo al repo (Upload files → drag → Commit). GitHub Pages se actualiza solo en ~30 segundos.
+1. [github.com/new](https://github.com/new) → nombre `agroadvisor`, público
+2. Upload files → arrastrá **todos los archivos** → Commit
+3. Settings → Pages → Branch: `main`, carpeta `/ (root)` → Save
+4. Esperar 1-2 min → `https://TU-USUARIO.github.io/agroadvisor/`
 
-## Notas
+### Actualizar
 
-- **CORS**: La API Bold no acepta requests directos desde el browser. El advisor funciona en modo mock (sin detección real) hasta que se implemente un proxy server-side.
-- **iOS Safari**: Compatible. El mapa Leaflet y el draw funcionan con touch.
-- **Credenciales**: Las credenciales de producción están embebidas en el HTML. Para un deploy real, moverlas a un backend.
+Upload files → arrastrá los archivos modificados → Commit. Se actualiza en ~30 seg.
+
+## Para editar
+
+| Querés cambiar... | Archivo |
+|---|---|
+| Un convenio/merchant | `catalog.js` (buscá por nombre) |
+| Pesos del scoring | `data.js` → const W |
+| Calendario agronómico | `data.js` → const CAL |
+| Textos de recomendación | `scoring.js` → buildRecomendacion |
+| Credenciales API | `index.html` → cfg-client/cfg-secret |
+| Look & feel | `styles.css` |
+| Layout de pantallas | `index.html` |
+| Cómo se muestran los resultados | `ui.js` |
+| Flujo de consulta | `app.js` → consultar() |
+| Mapa / geoloc | `map.js` |
