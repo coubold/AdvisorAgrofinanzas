@@ -3352,14 +3352,22 @@ function scoreTier(sc, topScore) {
   return { label: 'Disponible', color: '#9E9E9E', bg: 'var(--g1)' };
 }
 
-// ── Recomendación del asesor (texto fluido, reemplaza bloques rígidos) ──
+// ── Recomendación del asesor (texto fluido, menciona cultivos detectados) ──
 function buildRecomendacion(c, cultivo, conf, etapa) {
   const cL = CROP_LABEL[cultivo] || cultivo;
   const eL = (ETAPA_LABEL[etapa] || etapa).toLowerCase();
 
-  // Apertura: situación del lote
+  // Check which detected crops this convenio covers
+  const allCrops = appState.detResult?.allCrops || [];
+  const coveredCrops = allCrops.filter(ac => c.cultivos.includes(ac.cultivo));
+  const coveredNames = coveredCrops.map(ac => CROP_LABEL[ac.cultivo]);
+
+  // Apertura: qué cultivos tiene el lote
   let opening = '';
-  if (conf >= 0.70) {
+  if (allCrops.length > 1 && conf >= 0.45) {
+    const cropList = allCrops.map(ac => `<strong>${CROP_LABEL[ac.cultivo]}</strong> (${ac.ha.toFixed(0)} ha)`).join(', ');
+    opening = `En tu lote detectamos ${cropList}. Estás transitando la etapa de <strong>${eL}</strong>.`;
+  } else if (conf >= 0.70) {
     opening = `Tu lote tiene <strong>${cL}</strong> en etapa de <strong>${eL}</strong>.`;
   } else if (conf >= 0.45) {
     opening = `Identificamos actividad consistente con <strong>${cL}</strong>, probablemente en <strong>${eL}</strong>.`;
@@ -3367,20 +3375,25 @@ function buildRecomendacion(c, cultivo, conf, etapa) {
     opening = `Basándonos en la época del año, tu lote estaría transitando la etapa de <strong>${eL}</strong>.`;
   }
 
-  // Contexto agronómico (por qué esta categoría importa ahora)
+  // Contexto agronómico
   const catCtx = getCatCtx(c.cat, cultivo, etapa);
 
-  // Gancho financiero (por qué este convenio en particular)
+  // Gancho financiero — menciona para qué cultivos aplica
   let finHook = '';
+  const applicability = coveredNames.length > 0 && coveredNames.length < allCrops.length
+    ? ` Aplica para tu ${coveredNames.join(' y ')}.`
+    : coveredNames.length === allCrops.length && allCrops.length > 1
+      ? ` Aplica para todos tus cultivos.`
+      : '';
+
   if (c.tna0) {
-    finHook = `<strong>${c.nombre}</strong> te permite financiar esto a <strong>tasa 0% en dólares</strong> — cubrís el gasto sin costo financiero si cancelás en plazo.`;
+    finHook = `<strong>${c.nombre}</strong> te permite financiar esto a <strong>tasa 0% en dólares</strong> — cubrís el gasto sin costo financiero si cancelás en plazo.${applicability}`;
   } else if (c.sub) {
-    finHook = `Con <strong>${c.nombre}</strong>, BBVA subsidia parte de la tasa nominal, reduciendo el costo real del financiamiento.`;
+    finHook = `Con <strong>${c.nombre}</strong>, BBVA subsidia parte de la tasa nominal, reduciendo el costo real del financiamiento.${applicability}`;
   } else {
-    finHook = `<strong>${c.nombre}</strong> ofrece una TNA desde ${c.tnaMin}%, competitiva para el segmento agropecuario.`;
+    finHook = `<strong>${c.nombre}</strong> ofrece una TNA desde ${c.tnaMin}%, competitiva para el segmento agropecuario.${applicability}`;
   }
 
-  // Combinar como párrafo fluido
   let text = opening;
   if (catCtx) text += ' ' + catCtx;
   text += ' ' + finHook;
@@ -3409,12 +3422,18 @@ function buildRecomendacionGeneric(c) {
   return situacion + ' ' + finHook;
 }
 
-// ── Texto corto para tarjetas (tono de asesor) ──
+// ── Texto corto para tarjetas (menciona cultivos) ──
 function buildShort(c, cultivo, etapa) {
   const eL = (ETAPA_LABEL[etapa] || etapa).toLowerCase();
-  if (c.tna0) return `Oportunidad: tasa 0% en dólares para la ${eL}.`;
-  if (c.sub) return `Tasa subsidiada por BBVA, ideal para la ${eL}.`;
-  return `Financiamiento desde ${c.tnaMin}% TNA para la ${eL}.`;
+  const allCrops = appState.detResult?.allCrops || [];
+  const coveredCrops = allCrops.filter(ac => c.cultivos.includes(ac.cultivo));
+  const cropStr = coveredCrops.length > 1
+    ? coveredCrops.map(ac => CROP_LABEL[ac.cultivo]).join(', ')
+    : CROP_LABEL[cultivo] || cultivo;
+
+  if (c.tna0) return `Tasa 0% USD para ${cropStr} en ${eL}.`;
+  if (c.sub) return `Tasa subsidiada para ${cropStr} en ${eL}.`;
+  return `Desde ${c.tnaMin}% TNA para ${cropStr} en ${eL}.`;
 }
 
 function buildShortGeneric(c) {
@@ -3567,37 +3586,62 @@ function parseDets(resp) {
   return res;
 }
 
-// Get main crop — returns null if nothing detected
+// Get ALL crops from the most recent month — returns {principal, allCrops[], conf}
 function getCultivoActual(dets) {
   if (!dets.length) return null;
-  dets.sort((a, b) => b.pct - a.pct);
-  return { cultivo: dets[0].cultivo, conf: Math.min(dets[0].pct, 1), ha: dets[0].ha };
+
+  // Find most recent month
+  const latest = dets.reduce((a, b) => (b.year > a.year || (b.year === a.year && b.month > a.month)) ? b : a);
+  const latestMonth = dets.filter(d => d.year === latest.year && d.month === latest.month);
+
+  // Sort by ha descending
+  latestMonth.sort((a, b) => b.ha - a.ha);
+
+  const totalHa = latestMonth.reduce((a, c) => a + c.ha, 0);
+  const allCrops = latestMonth.map(c => ({
+    cultivo: c.cultivo,
+    ha: c.ha,
+    pct: totalHa > 0 ? c.ha / totalHa : 0
+  }));
+
+  const principal = allCrops[0];
+  return {
+    cultivo: principal.cultivo,
+    conf: Math.min(principal.pct, 1),
+    ha: principal.ha,
+    allCrops,
+    month: latest.month,
+    year: latest.year
+  };
 }
 
 // Mock only for when API is unreachable (CORS) — clearly marked
 function mockDetect(coords) {
-  return { cultivo: null, conf: 0, ha: 0, isMock: true };
+  return { cultivo: null, conf: 0, ha: 0, allCrops: [], isMock: true };
 }
 
-// ── Hist analysis for agrofinance summary ──
+// ── Hist analysis for agrofinance summary (agrupado por campaña jul-jun) ──
 function analyzeHist(histRaw) {
   if (!histRaw || !histRaw.length) return null;
 
-  // Group by campaign (year)
+  // Map each detection to a campaign: month 7-12 → Y/(Y+1), month 1-6 → (Y-1)/Y
   const campaigns = {};
   histRaw.forEach(d => {
-    const key = `${d.year}`;
+    const campStart = d.month >= 7 ? d.year : d.year - 1;
+    const key = `${campStart}/${campStart + 1}`;
     if (!campaigns[key]) campaigns[key] = [];
     campaigns[key].push(d);
   });
 
   // Find dominant crop per campaign
   const campCrops = [];
-  for (const [yr, crops] of Object.entries(campaigns).sort((a, b) => a[0] - b[0])) {
+  for (const [camp, crops] of Object.entries(campaigns).sort((a, b) => a[0].localeCompare(b[0]))) {
     const actionable = crops.filter(c => CROP_MAP[c.name?.toLowerCase()]);
     if (actionable.length) {
       actionable.sort((a, b) => b.value - a.value);
-      campCrops.push({ year: parseInt(yr), crop: actionable[0].name, ha: actionable[0].value });
+      const startYear = parseInt(camp.split('/')[0]);
+      const label = `${String(startYear).slice(-2)}/${String(startYear + 1).slice(-2)}`;
+      campCrops.push({ campaign: camp, label, crop: actionable[0].name, ha: actionable[0].value });
     }
   }
 
@@ -3800,12 +3844,27 @@ function showReco() {
   const lnombre = document.getElementById('inp-nombre').value || 'Sin nombre';
 
   // ── Header ──
+  const allCrops = det?.allCrops || [];
   if (cultivo) {
-    document.getElementById('reco-title').textContent = `${CROP_EMOJI[cultivo] || ''} ${CROP_LABEL[cultivo] || cultivo} — ${lnombre}`;
+    const cropNames = allCrops.map(c => `${CROP_EMOJI[c.cultivo] || ''} ${CROP_LABEL[c.cultivo]} (${c.ha.toFixed(0)} ha)`).join(', ');
+    document.getElementById('reco-title').textContent = `${lnombre}`;
     document.getElementById('crop-tag').textContent = CROP_LABEL[cultivo] || cultivo;
     document.getElementById('etapa-tag').textContent = ETAPA_LABEL[etapa] || etapa;
+
+    // Show all crops as tags
+    const tagsContainer = document.getElementById('crop-tag').parentElement;
+    const existingExtra = tagsContainer.querySelectorAll('.ph-tag-crop-extra');
+    existingExtra.forEach(el => el.remove());
+    allCrops.forEach(c => {
+      const tag = document.createElement('span');
+      tag.className = 'ph-tag ph-tag-crop ph-tag-crop-extra';
+      tag.textContent = `${CROP_EMOJI[c.cultivo] || ''} ${CROP_LABEL[c.cultivo]} ${c.ha.toFixed(0)} ha`;
+      tagsContainer.insertBefore(tag, document.getElementById('etapa-tag'));
+    });
+    document.getElementById('crop-tag').style.display = 'none';
   } else {
     document.getElementById('reco-title').textContent = `📊 ${lnombre} — Sin cultivo detectado`;
+    document.getElementById('crop-tag').style.display = '';
     document.getElementById('crop-tag').textContent = 'Sin cultivo';
     document.getElementById('etapa-tag').textContent = 'General';
   }
@@ -3824,7 +3883,7 @@ function showReco() {
     const timeline = histA.campaigns.map(c => {
       const emoji = CROP_EMOJI[CROP_MAP[c.crop?.toLowerCase()]] || '🌿';
       return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:.5px solid var(--g2);">
-        <span style="font-size:11px;font-weight:700;color:var(--g4);min-width:40px;">${c.year}</span>
+        <span style="font-size:11px;font-weight:700;color:var(--g4);min-width:44px;">${c.label}</span>
         <span style="font-size:14px;">${emoji}</span>
         <span style="font-size:12px;font-weight:600;color:var(--g9);">${c.crop}</span>
         <span style="font-size:11px;color:var(--g4);margin-left:auto;">${c.ha?.toFixed(0)} ha</span>
@@ -3865,7 +3924,7 @@ function showReco() {
     }
 
     histHtml = `<div style="padding:12px 16px;background:var(--w);border-bottom:.5px solid var(--g2);">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--g4);margin-bottom:6px;">Historial del lote · Crop Detection Hist</div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--g4);margin-bottom:6px;">Historial del lote por campaña</div>
       <div style="background:var(--g1);border-radius:12px;padding:10px 14px;">${timeline}</div>
       ${badge}${insight}
     </div>`;
@@ -4092,7 +4151,7 @@ async function consultar() {
     detResult = mockDetect(appState.polygon);
   }
   await delay(800); step(1);
-  appState.detResult = detResult || { cultivo: null, conf: 0, ha: 0 };
+  appState.detResult = detResult || { cultivo: null, conf: 0, ha: 0, allCrops: [] };
   appState.apiRaw = apiRaw;
 
   // ── Step 2: Crop Detection Hist (for agrofinance summary, NOT for scoring) ──
