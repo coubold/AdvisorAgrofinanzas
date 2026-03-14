@@ -132,7 +132,7 @@ function analyzeHist(histRaw) {
   // Find dominant crop per campaign
   const campCrops = [];
   for (const [camp, crops] of Object.entries(campaigns).sort((a, b) => a[0].localeCompare(b[0]))) {
-    const actionable = crops.filter(c => CROP_MAP[c.name?.toLowerCase()]);
+    const actionable = crops.filter(c => CROP_MAP[c.name?.toLowerCase()] && c.value > 0);
     if (actionable.length) {
       actionable.sort((a, b) => b.value - a.value);
       const startYear = parseInt(camp.split('/')[0]);

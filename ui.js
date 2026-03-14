@@ -109,6 +109,17 @@ function showReco() {
       <div style="background:var(--g1);border-radius:12px;padding:10px 14px;">${timeline}</div>
       ${badge}${insight}
     </div>`;
+  } else if (!cultivo) {
+    // No crop detected AND no agricultural history
+    histHtml = `<div style="padding:16px;background:var(--w);border-bottom:.5px solid var(--g2);">
+      <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--g1);border-radius:12px;">
+        <span style="font-size:22px;">🏜️</span>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--g9);">Sin actividad agrícola detectada</div>
+          <div style="font-size:12px;color:var(--g6);line-height:1.5;margin-top:2px;">Este lote no presenta cultivos actuales ni historial de producción agrícola en las campañas analizadas. Las recomendaciones se basan en las mejores condiciones financieras generales.</div>
+        </div>
+      </div>
+    </div>`;
   }
 
   // ── Summary stats ──
