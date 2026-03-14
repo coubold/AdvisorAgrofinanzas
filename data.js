@@ -149,6 +149,63 @@ const CAT_CONTEXT = {
   },
 };
 
+// ── Próxima etapa (para recomendaciones anticipadas) ──
+
+const NEXT_ETAPA = {
+  pre_siembra: 'siembra',
+  siembra: 'desarrollo',
+  desarrollo: 'proteccion',
+  proteccion: 'cosecha',
+  cosecha: 'poscosecha',
+  poscosecha: 'pre_siembra'
+};
+
+const ANTICIPATION = {
+  pre_siembra: {
+    msg: 'La siembra arranca pronto',
+    cats: {
+      semillas: 'Reservá semillas antes de que escaseen — los cupos se agotan rápido en los mejores híbridos.',
+      fertilizantes: 'Asegurá fertilizantes de base a precio actual. Comprar anticipado puede ahorrarte 5–10% vs. compra en campaña.',
+    }
+  },
+  siembra: {
+    msg: 'El cultivo entrará en desarrollo',
+    cats: {
+      proteccion_cultivos: 'Planificá la protección fitosanitaria ahora — tener el producto en depósito evita aplicar tarde por falta de stock.',
+      fertilizantes: 'La fertilización nitrogenada de macollaje o V6 se define ahora. Asegurá la fuente.',
+    }
+  },
+  desarrollo: {
+    msg: 'La etapa de protección se acerca',
+    cats: {
+      proteccion_cultivos: 'Tené listo el programa fitosanitario completo. Un fungicida aplicado a tiempo vale más que dos tarde.',
+    }
+  },
+  proteccion: {
+    msg: 'La cosecha se aproxima',
+    cats: {
+      maquinaria: 'Si necesitás renovar cosechadora o cabezal, financiar ahora te da la máquina lista para la ventana de cosecha.',
+      financiamiento: 'Buen momento para asegurar capital de trabajo — la logística de cosecha requiere liquidez.',
+    }
+  },
+  cosecha: {
+    msg: 'Post-cosecha: momento ideal para planificar',
+    cats: {
+      maquinaria: 'Con el ingreso de la cosecha, es el mejor momento para renovar maquinaria con financiamiento a largo plazo.',
+      semillas: 'Reservá semillas para la próxima campaña. Los cupos premium se asignan ahora.',
+      financiamiento: 'Planificá el capital para la campaña que viene — las mejores tasas se negocian en la entre-campaña.',
+    }
+  },
+  poscosecha: {
+    msg: 'La próxima campaña arranca pronto',
+    cats: {
+      semillas: 'Asegurá cupo de semillas para la próxima siembra — la compra anticipada garantiza disponibilidad y mejores precios.',
+      fertilizantes: 'Los fertilizantes de base se compran ahora. La logística de fósforo se complica cerca de la siembra.',
+      maquinaria: 'Entre campañas es el momento de mejor negociación para maquinaria.',
+    }
+  }
+};
+
 // ── Estado global de la aplicación ──
 
 const appState = {

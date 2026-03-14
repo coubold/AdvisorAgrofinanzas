@@ -145,29 +145,103 @@ function mockHist(cultivo) {
 function scoreAll(cultivo, conf) {
   const mes = new Date().getMonth() + 1;
   const etapa = cultivo ? (CAL[cultivo] || {})[mes] || 'general' : 'general';
+  const nextEtapa = NEXT_ETAPA[etapa] || 'general';
   const hist = cultivo ? mockHist(cultivo) : {};
+  const antic = ANTICIPATION[etapa] || {};
 
+  // Score current etapa
   const scored = CATALOG.map(c => ({
     ...c,
     score: cultivo ? scoreConv(c, cultivo, conf, hist, etapa) : scoreGeneric(c, mes),
     expl_short: cultivo ? buildShort(c, cultivo, etapa) : buildShortGeneric(c),
-    recomendacion: cultivo ? buildRecomendacion(c, cultivo, conf, etapa) : buildRecomendacionGeneric(c)
+    recomendacion: cultivo ? buildRecomendacion(c, cultivo, conf, etapa) : buildRecomendacionGeneric(c),
+    anticipar: false
   }));
+
+  // Score anticipated convenios (next etapa, only for relevant categories)
+  if (cultivo && antic.cats) {
+    const anticipatedCats = Object.keys(antic.cats);
+    const currentIds = new Set();
+
+    // Collect IDs that already scored well for current etapa
+    scored.filter(c => c.score > 0.1).forEach(c => currentIds.add(c.id));
+
+    CATALOG.forEach(c => {
+      // Only anticipate if the category is in the anticipation map
+      if (!anticipatedCats.includes(c.cat)) return;
+      // Only if this convenio fits the next etapa
+      if (!c.etapas.includes(nextEtapa) && !c.etapas.includes('general')) return;
+      // Only if it matches the detected crop
+      if (!c.cultivos.includes(cultivo) && !c.cultivos.includes('general')) return;
+
+      const baseScore = scoreConv(c, cultivo, conf, hist, nextEtapa);
+      // Discount slightly so anticipated items rank below current matches
+      const discountedScore = Math.round(baseScore * 0.85 * 1000) / 1000;
+
+      // Check if this convenio already exists in scored with a good score
+      const existing = scored.find(s => s.id === c.id);
+      if (existing && existing.score >= discountedScore) return;
+
+      const anticMsg = antic.cats[c.cat] || '';
+      const nextEtapaLabel = (ETAPA_LABEL[nextEtapa] || nextEtapa).toLowerCase();
+
+      scored.push({
+        ...c,
+        score: discountedScore,
+        expl_short: `Anticipá: ${anticMsg || buildShort(c, cultivo, nextEtapa)}`,
+        recomendacion: buildRecomendacionAnticipado(c, cultivo, conf, etapa, nextEtapa, anticMsg),
+        anticipar: true,
+        anticiparEtapa: nextEtapa
+      });
+    });
+  }
 
   scored.sort((a, b) => b.score - a.score);
 
+  // Select top, mixing current + anticipated
   const cats = {};
   const res = [];
+  let anticipatedCount = 0;
   for (const c of scored) {
     const max = c.cat === 'maquinaria' ? 3 : 2;
-    if ((cats[c.cat] || 0) < max) {
+    // Allow up to 3 anticipated in the mix
+    if (c.anticipar && anticipatedCount >= 3) continue;
+    if ((cats[c.cat + (c.anticipar ? '_ant' : '')] || 0) < max) {
       res.push(c);
-      cats[c.cat] = (cats[c.cat] || 0) + 1;
+      cats[c.cat + (c.anticipar ? '_ant' : '')] = (cats[c.cat + (c.anticipar ? '_ant' : '')] || 0) + 1;
+      if (c.anticipar) anticipatedCount++;
     }
-    if (res.length >= 10) break;
+    if (res.length >= 12) break;
   }
 
-  return { etapa, mes, top: res, allScored: scored, noCrop: !cultivo };
+  return { etapa, nextEtapa, mes, top: res, allScored: scored, noCrop: !cultivo };
+}
+
+// ── Recomendación anticipada ──
+function buildRecomendacionAnticipado(c, cultivo, conf, etapaActual, nextEtapa, anticMsg) {
+  const cL = CROP_LABEL[cultivo] || cultivo;
+  const eActual = (ETAPA_LABEL[etapaActual] || etapaActual).toLowerCase();
+  const eNext = (ETAPA_LABEL[nextEtapa] || nextEtapa).toLowerCase();
+  const antic = ANTICIPATION[etapaActual] || {};
+
+  let opening = `Tu <strong>${cL}</strong> está en <strong>${eActual}</strong>, pero la <strong>${eNext}</strong> se acerca.`;
+
+  // Anticipation message
+  let anticipMsg = anticMsg
+    ? ` ${anticMsg}`
+    : ` Es buen momento para anticipar insumos de ${CAT_LABEL[c.cat]?.toLowerCase() || c.cat}.`;
+
+  // Financial hook
+  let finHook = '';
+  if (c.tna0) {
+    finHook = ` <strong>${c.nombre}</strong> te ofrece <strong>tasa 0% en dólares</strong> para asegurar esto ahora sin costo financiero.`;
+  } else if (c.sub) {
+    finHook = ` Con <strong>${c.nombre}</strong>, BBVA subsidia la tasa — comprando anticipado maximizás el beneficio.`;
+  } else {
+    finHook = ` <strong>${c.nombre}</strong> ofrece TNA desde ${c.tnaMin}% para financiar la compra anticipada.`;
+  }
+
+  return opening + anticipMsg + finHook;
 }
 
 // Generic scoring when no crop detected — weight financial conditions more

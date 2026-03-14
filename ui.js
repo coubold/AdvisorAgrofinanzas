@@ -125,10 +125,17 @@ function showReco() {
 
   // ── Category filter chips ──
   const catCounts = {};
-  top.forEach(c => { catCounts[c.cat] = (catCounts[c.cat] || 0) + 1; });
+  let anticCount = 0;
+  top.forEach(c => {
+    catCounts[c.cat] = (catCounts[c.cat] || 0) + 1;
+    if (c.anticipar) anticCount++;
+  });
   let chips = `<div class="cat-chip active" data-cat="all" onclick="filterCat('all')">Todos <span class="chip-count">(${top.length})</span></div>`;
   for (const [cat, count] of Object.entries(catCounts)) {
     chips += `<div class="cat-chip" data-cat="${cat}" onclick="filterCat('${cat}')">${CAT_LABEL[cat] || cat} <span class="chip-count">(${count})</span></div>`;
+  }
+  if (anticCount > 0) {
+    chips += `<div class="cat-chip" data-cat="anticipar" onclick="filterCat('anticipar')" style="border-color:var(--am);">Anticipar <span class="chip-count">(${anticCount})</span></div>`;
   }
   document.getElementById('cat-bar').innerHTML = chips;
   appState.activeCatFilter = 'all';
@@ -152,9 +159,14 @@ function filterCat(cat) {
   document.querySelectorAll('.cat-chip').forEach(c => {
     c.classList.toggle('active', c.dataset.cat === cat);
   });
-  const filtered = cat === 'all'
-    ? appState.recoResult.top
-    : appState.recoResult.top.filter(c => c.cat === cat);
+  let filtered;
+  if (cat === 'all') {
+    filtered = appState.recoResult.top;
+  } else if (cat === 'anticipar') {
+    filtered = appState.recoResult.top.filter(c => c.anticipar);
+  } else {
+    filtered = appState.recoResult.top.filter(c => c.cat === cat);
+  }
   renderList(filtered);
 }
 
@@ -169,6 +181,7 @@ function renderList(items) {
     const tier = scoreTier(c.score, topScore);
 
     const tags = [];
+    if (c.anticipar) tags.push('<span class="tpill" style="background:#FEF3DE;color:#B86B00;">Anticipar</span>');
     if (c.tna0) tags.push('<span class="tpill tg">Tasa 0% USD</span>');
     if (c.sub && !c.tna0) tags.push('<span class="tpill tg">Subsidiado BBVA</span>');
     if (c.usd && !c.tna0) tags.push('<span class="tpill tb">USD disponible</span>');
@@ -216,6 +229,8 @@ function showDetalle(c, idx) {
   const cultivo = det.cultivo;
   const conf = det.conf || 0;
   const recoText = c.recomendacion || (cultivo ? buildRecomendacion(c, cultivo, conf, etapa) : buildRecomendacionGeneric(c));
+  const recoLabel = c.anticipar ? 'Anticipar para la próxima etapa' : 'Recomendación del asesor';
+  const recoBg = c.anticipar ? 'background:var(--ama);' : 'background:var(--g1);';
 
   document.getElementById('det-wrap').innerHTML = `
     <div class="det-card">
@@ -232,8 +247,8 @@ function showDetalle(c, idx) {
         </div>
       </div>
       <div style="padding:16px 20px;">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--g4);margin-bottom:8px;">Recomendación del asesor</div>
-        <div style="font-size:14px;line-height:1.65;color:var(--g9);background:var(--g1);border-radius:12px;padding:16px 18px;">${recoText}</div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${c.anticipar ? 'var(--am)' : 'var(--g4)'};margin-bottom:8px;">${recoLabel}</div>
+        <div style="font-size:14px;line-height:1.65;color:var(--g9);${recoBg}border-radius:12px;padding:16px 18px;">${recoText}</div>
       </div>
       <div class="det-sec">Condiciones disponibles</div>
       <div class="cgrid">
