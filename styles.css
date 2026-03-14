@@ -99,7 +99,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Ne
 .lsdot.wait{background:var(--g2);}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .lstx{font-size:13px;color:var(--g9);}
-.lstx.done{color:var(--g4);text-decoration:line-through;}
+.lstx.done{color:var(--g9);}
 .load-tl{font-size:17px;font-weight:700;color:var(--g9);}
 .load-st{font-size:12px;color:var(--g4);text-align:center;}
 

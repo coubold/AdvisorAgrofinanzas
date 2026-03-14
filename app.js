@@ -22,7 +22,6 @@ async function consultar() {
   const txs = [0, 1, 2, 3].map(i => document.getElementById('tx' + i));
   const step = (i) => {
     dots[i].className = 'lsdot done';
-    txs[i].className = 'lstx done';
     if (dots[i + 1]) { dots[i + 1].className = 'lsdot run'; }
   };
 
@@ -132,4 +131,19 @@ function hideModal(e) {
 (async function init() {
   await fetchCatalog();
   initMap();
+
+  // Auto-validar API silenciosamente
+  try {
+    const cid = document.getElementById('cfg-client').value;
+    if (cid) {
+      await getToken();
+      document.getElementById('api-status').textContent = 'CONECTADO';
+      document.getElementById('api-status').className = 'api-status ok';
+      document.getElementById('alert-api').style.display = 'none';
+    }
+  } catch (e) {
+    document.getElementById('api-status').textContent = 'OFFLINE';
+    document.getElementById('api-status').className = 'api-status mock';
+    document.getElementById('alert-api').style.display = 'none';
+  }
 })();

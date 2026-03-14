@@ -80,6 +80,27 @@ function onPolygon(layer) {
   document.getElementById('ha-disp').textContent = `${ha.toFixed(1)} ha`;
   document.getElementById('ha-disp').style.display = 'block';
   document.getElementById('btn-consultar').disabled = false;
+
+  // Clear old location data and reverse geocode from polygon center
+  document.getElementById('inp-loc').value = '';
+  document.getElementById('inp-prov').value = '';
+  const center = layer.getBounds().getCenter();
+  reverseGeocode(center.lat, center.lng);
+}
+
+async function reverseGeocode(lat, lng) {
+  try {
+    const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10`);
+    const data = await resp.json();
+    if (data?.address) {
+      const loc = data.address.city || data.address.town || data.address.village || data.address.county || '';
+      const prov = data.address.state || '';
+      document.getElementById('inp-loc').value = loc;
+      document.getElementById('inp-prov').value = prov;
+    }
+  } catch (e) {
+    console.warn('Reverse geocode failed:', e.message);
+  }
 }
 
 // ── Búsqueda de localidad — Nominatim autocomplete ──
