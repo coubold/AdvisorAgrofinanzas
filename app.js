@@ -18,8 +18,8 @@ function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 async function consultar() {
   showTab('loading');
-  const dots = [0, 1, 2, 3].map(i => document.getElementById('dot' + i));
-  const txs = [0, 1, 2, 3].map(i => document.getElementById('tx' + i));
+  const dots = [0, 1, 2, 3, 4].map(i => document.getElementById('dot' + i));
+  const txs = [0, 1, 2, 3, 4].map(i => document.getElementById('tx' + i));
   const step = (i) => {
     dots[i].className = 'lsdot done';
     if (dots[i + 1]) { dots[i + 1].className = 'lsdot run'; }
@@ -79,13 +79,29 @@ async function consultar() {
   await delay(600); step(2);
   appState.histAnalysis = histAnalysis;
 
+  // ── Step 2b: Flood Detection (water stress / flood risk) ──
+  let floodAnalysis = null;
+  if (useApi) {
+    try {
+      const floodBody = { geometry, customerId: custId, surface: null };
+      const floodResp = await callBold('v1/flooddetection', floodBody);
+      const floodRaw = parseFloodRaw(floodResp);
+      floodAnalysis = analyzeFlood(floodRaw);
+    } catch (e) {
+      console.warn('Flood Detection failed:', e);
+    }
+  }
+  appState.floodAnalysis = floodAnalysis;
+
+  await delay(500); step(3);
+
   // ── Step 3: Score convenios (based on crop detection only) ──
   const cultivo = appState.detResult.cultivo;
   const conf = appState.detResult.conf || 0;
   const reco = scoreAll(cultivo, conf);
   appState.recoResult = reco;
   appState.allScored = reco.allScored;
-  await delay(500); step(3);
+  await delay(500); step(4);
 
   await delay(400);
   showReco();

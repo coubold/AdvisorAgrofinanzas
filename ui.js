@@ -127,7 +127,67 @@ function showReco() {
   const tasa0 = top.filter(c => c.tna0).length;
   const subsi = top.filter(c => c.sub).length;
   const catSet = new Set(top.map(c => c.cat));
-  document.getElementById('reco-summary').innerHTML = apiRawHtml + histHtml + `
+
+  // ── Flood / water stress panel ──
+  let floodHtml = '';
+  const floodA = appState.floodAnalysis;
+  if (floodA && floodA.hasData && floodA.campaigns.length) {
+    // Mini timeline: one row per campaign with water status
+    const floodTimeline = floodA.campaigns.map(c => {
+      // Mini bar: proportion of flood/dry/normal months
+      const pctFlood = Math.round((c.floodMonths / c.totalMonths) * 100);
+      const pctDry = Math.round((c.dryMonths / c.totalMonths) * 100);
+      const pctNormal = 100 - pctFlood - pctDry;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:.5px solid var(--g2);">
+        <span style="font-size:11px;font-weight:700;color:var(--g4);min-width:44px;">${c.label}</span>
+        <span style="font-size:12px;font-weight:600;">${c.emoji} ${c.statusLabel}</span>
+        <div style="flex:1;display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--g2);margin-left:8px;min-width:60px;">
+          ${pctFlood > 0 ? `<div style="width:${pctFlood}%;background:#1565C0;"></div>` : ''}
+          ${pctNormal > 0 ? `<div style="width:${pctNormal}%;background:#66BB6A;"></div>` : ''}
+          ${pctDry > 0 ? `<div style="width:${pctDry}%;background:#EF6C00;"></div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+
+    // Legend
+    const legend = `<div style="display:flex;gap:12px;margin-top:8px;">
+      <span style="font-size:10px;color:var(--g4);display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:2px;background:#1565C0;display:inline-block;"></span> Exceso</span>
+      <span style="font-size:10px;color:var(--g4);display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:2px;background:#66BB6A;display:inline-block;"></span> Normal</span>
+      <span style="font-size:10px;color:var(--g4);display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:2px;background:#EF6C00;display:inline-block;"></span> Seco</span>
+    </div>`;
+
+    // Risk badge
+    let floodBadge = '';
+    const riskBg = floodA.riskProfile === 'stable' ? '#E8F5E9' : floodA.riskProfile === 'flood_prone' ? '#E3F2FD' : floodA.riskProfile === 'drought_prone' ? '#FFF3E0' : '#FFFDE7';
+    const riskBorder = floodA.riskProfile === 'stable' ? '#A5D6A7' : floodA.riskProfile === 'flood_prone' ? '#90CAF9' : floodA.riskProfile === 'drought_prone' ? '#FFCC80' : '#FFF176';
+    const riskEmoji = floodA.riskProfile === 'stable' ? '✅' : floodA.riskProfile === 'flood_prone' ? '🌊' : floodA.riskProfile === 'drought_prone' ? '🏜️' : '⚡';
+
+    floodBadge = `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:${riskBg};border:1px solid ${riskBorder};border-radius:12px;margin-top:10px;">
+      <span style="font-size:20px;">${riskEmoji}</span>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:${floodA.riskColor};">${floodA.riskLabel}</div>
+        <div style="font-size:11px;color:var(--g6);line-height:1.4;">${FLOOD_RISK_INSIGHT[floodA.riskProfile] || ''}</div>
+      </div>
+    </div>`;
+
+    // Summary line
+    const summaryParts = [];
+    if (floodA.floodCamps > 0) summaryParts.push(`${floodA.floodCamps} campaña${floodA.floodCamps > 1 ? 's' : ''} con exceso hídrico`);
+    if (floodA.dryCamps > 0) summaryParts.push(`${floodA.dryCamps} con estrés hídrico`);
+    if (floodA.normalCamps > 0) summaryParts.push(`${floodA.normalCamps} en condición normal`);
+    const summaryLine = summaryParts.length
+      ? `<div style="font-size:11px;color:var(--g6);margin-top:6px;">${floodA.totalCamps} campañas analizadas: ${summaryParts.join(', ')}.</div>`
+      : '';
+
+    floodHtml = `<div style="padding:12px 16px;background:var(--w);border-bottom:.5px solid var(--g2);">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--g4);margin-bottom:6px;">Análisis hídrico por campaña</div>
+      <div style="background:var(--g1);border-radius:12px;padding:10px 14px;">${floodTimeline}${legend}</div>
+      ${summaryLine}
+      ${floodBadge}
+    </div>`;
+  }
+
+  document.getElementById('reco-summary').innerHTML = apiRawHtml + histHtml + floodHtml + `
     <div style="display:flex;gap:12px;padding:10px 16px;overflow-x:auto;">
       <div class="reco-stat"><div class="reco-stat-n">${top.length}</div><div class="reco-stat-l">convenios<br>seleccionados</div></div>
       <div class="reco-stat"><div class="reco-stat-n">${catSet.size}</div><div class="reco-stat-l">categorías<br>representadas</div></div>

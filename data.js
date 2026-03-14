@@ -216,5 +216,27 @@ const appState = {
   allScored: [],
   activeCatFilter: 'all',
   apiRaw: null,
-  histAnalysis: null
+  histAnalysis: null,
+  floodAnalysis: null
+};
+
+// ── Constantes para análisis hídrico ──
+
+const FLOOD_STATUS_LABEL = {
+  inundacion: 'Inundación',
+  exceso: 'Exceso hídrico',
+  evento_inundacion: 'Evento de inundación',
+  seca: 'Campaña seca',
+  estres_hidrico: 'Estrés hídrico',
+  humedo: 'Humedad moderada',
+  seco: 'Sin agua superficial',
+  normal: 'Normal',
+  sin_datos: 'Sin datos'
+};
+
+const FLOOD_RISK_INSIGHT = {
+  flood_prone: 'Este lote muestra recurrencia de exceso hídrico en múltiples campañas. El riesgo de anegamiento puede afectar rendimientos y operabilidad. Desde el punto de vista crediticio, conviene priorizar cultivos tolerantes y considerar seguros con cobertura de exceso hídrico.',
+  drought_prone: 'El lote presenta estrés hídrico recurrente en varias campañas. La falta de agua superficial impacta el potencial de rendimiento. Financieramente, es recomendable evaluar inversiones en riego y seguros con cobertura de sequía.',
+  variable: 'El lote muestra variabilidad hídrica significativa entre campañas — alternando entre períodos secos y de exceso. Esta volatilidad incrementa el riesgo productivo. La diversificación de cultivos y el financiamiento flexible son estrategias clave.',
+  stable: 'El perfil hídrico del lote es estable, sin eventos extremos recurrentes. Esto representa un factor positivo desde el punto de vista crediticio y reduce la prima de riesgo asociada al lote.'
 };
