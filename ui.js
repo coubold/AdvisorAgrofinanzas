@@ -62,12 +62,13 @@ function showReco() {
   let histHtml = '';
   if (histA && histA.campaigns.length) {
     const timeline = histA.campaigns.map(c => {
-      const emoji = CROP_EMOJI[CROP_MAP[c.crop?.toLowerCase()]] || '🌿';
+      const cropNames = c.crops.map(name => {
+        const emoji = CROP_EMOJI[CROP_MAP[name?.toLowerCase()]] || '🌿';
+        return `${emoji} ${name}`;
+      }).join(' – ');
       return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:.5px solid var(--g2);">
         <span style="font-size:11px;font-weight:700;color:var(--g4);min-width:44px;">${c.label}</span>
-        <span style="font-size:14px;">${emoji}</span>
-        <span style="font-size:12px;font-weight:600;color:var(--g9);">${c.crop}</span>
-        <span style="font-size:11px;color:var(--g4);margin-left:auto;">${c.ha?.toFixed(0)} ha</span>
+        <span style="font-size:12px;font-weight:600;color:var(--g9);">${cropNames}</span>
       </div>`;
     }).join('');
 
@@ -98,7 +99,7 @@ function showReco() {
         <strong style="color:var(--nv);">Perfil agrofinanciero:</strong> Este lote muestra ${histA.totalCampaigns} campañas con ${histA.uniqueCrops.length} cultivos diferentes. La rotación ${histA.uniqueCrops.map(c => (CROP_LABEL[CROP_MAP[c?.toLowerCase()]] || c)).join(' → ')} es consistente con un esquema de producción sustentable. Desde el punto de vista crediticio, la diversificación de cultivos reduce la exposición a riesgos climáticos y de mercado concentrados en un solo commodity.
       </div>`;
     } else if (histA.totalCampaigns >= 2) {
-      const mainCrop = histA.campaigns[histA.campaigns.length - 1]?.crop;
+      const mainCrop = histA.campaigns[histA.campaigns.length - 1]?.crops?.[0] || 'cultivo';
       insight = `<div style="font-size:12px;color:var(--g6);line-height:1.5;margin-top:8px;padding:10px 12px;background:var(--lb);border-radius:10px;">
         <strong style="color:var(--nv);">Perfil agrofinanciero:</strong> Este lote muestra continuidad productiva en ${mainCrop} durante ${histA.totalCampaigns} campañas. La especialización indica inversión estructural en el cultivo, lo que puede favorecer el acceso a convenios específicos de la cadena.
       </div>`;

@@ -129,28 +129,38 @@ function analyzeHist(histRaw) {
     campaigns[key].push(d);
   });
 
-  // Find dominant crop per campaign
+  // Collect ALL unique crops per campaign (deduplicated)
   const campCrops = [];
   for (const [camp, crops] of Object.entries(campaigns).sort((a, b) => a[0].localeCompare(b[0]))) {
     const actionable = crops.filter(c => CROP_MAP[c.name?.toLowerCase()] && c.value > 0);
     if (actionable.length) {
-      actionable.sort((a, b) => b.value - a.value);
+      // Deduplicate by crop name, keep unique crops
+      const seen = new Set();
+      const uniqueInCamp = [];
+      for (const c of actionable) {
+        const key = c.name?.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueInCamp.push(c.name);
+        }
+      }
       const startYear = parseInt(camp.split('/')[0]);
       const label = `${String(startYear).slice(-2)}/${String(startYear + 1).slice(-2)}`;
-      campCrops.push({ campaign: camp, label, crop: actionable[0].name, ha: actionable[0].value });
+      campCrops.push({ campaign: camp, label, crops: uniqueInCamp });
     }
   }
 
-  // Rotation check: ≥2 different crops across campaigns
-  const uniqueCrops = new Set(campCrops.map(c => c.crop?.toLowerCase()));
-  const hasRotation = uniqueCrops.size >= 2 && campCrops.length >= 2;
+  // Rotation check: ≥2 different crops across all campaigns
+  const allCropNames = new Set();
+  campCrops.forEach(c => c.crops.forEach(name => allCropNames.add(name.toLowerCase())));
+  const hasRotation = allCropNames.size >= 2 && campCrops.length >= 2;
 
   // No deforestation: if ≥3 campaigns with crops, lote has agricultural history
   const noDeforestation = campCrops.length >= 3;
 
   return {
     campaigns: campCrops,
-    uniqueCrops: [...uniqueCrops],
+    uniqueCrops: [...allCropNames],
     hasRotation,
     noDeforestation,
     totalCampaigns: campCrops.length
