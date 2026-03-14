@@ -1,9 +1,4 @@
-// ═══════════════════════════════════════════════════════
-// CATÁLOGO BBVA — 57 merchants, 166 sub-productos
-// Fuente: catalog.json (fetch) → fallback a este array local
-// Fecha: marzo 2026
-// ═══════════════════════════════════════════════════════
-let CATALOG = [
+[
   {
     "id": 1,
     "nombre": "INDUSTRIAS COMOFRA S.R.L.",
@@ -2696,22 +2691,4 @@ let CATALOG = [
       }
     ]
   }
-];
-
-// ── Fetch catálogo desde JSON estático (simula endpoint) ──
-async function fetchCatalog() {
-  try {
-    const resp = await fetch('catalog.json');
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
-    if (Array.isArray(data) && data.length > 0) {
-      CATALOG = data;
-      console.log(`Catálogo cargado: ${CATALOG.length} convenios desde catalog.json`);
-      return true;
-    }
-    throw new Error('JSON vacío o inválido');
-  } catch (e) {
-    console.warn(`Fallback al catálogo local (${CATALOG.length} convenios):`, e.message);
-    return false;
-  }
-}
+]

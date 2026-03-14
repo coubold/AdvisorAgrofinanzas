@@ -129,4 +129,7 @@ function hideModal(e) {
 
 // ── Init ──
 
-initMap();
+(async function init() {
+  await fetchCatalog();
+  initMap();
+})();

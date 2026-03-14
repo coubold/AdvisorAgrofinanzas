@@ -5,37 +5,38 @@ Asistente de AgroFinanzas — prototipo con sensorización Bold y convenios BBVA
 ## Estructura
 
 ```
-index.html      ← HTML + layout (222 lín)
-styles.css      ← Estilos (224 lín)
-catalog.js      ← 57 merchants BBVA formateados (2699 lín)
-data.js         ← Constantes, lookups, estado global (163 lín)
-scoring.js      ← Motor de scoring y recomendaciones (189 lín)
-api.js          ← OAuth Bold, parseo, mock (158 lín)
-map.js          ← Leaflet, capas, dibujo, geoloc (149 lín)
-ui.js           ← Rendering de resultados y detalle (266 lín)
-app.js          ← Flujo principal, navegación, init (132 lín)
+index.html       ← HTML + layout
+styles.css       ← Estilos
+catalog.json     ← 57 convenios BBVA (endpoint simulado)
+catalog.js       ← Fallback local + fetchCatalog()
+data.js          ← Constantes, lookups, anticipación, estado global
+scoring.js       ← Motor de scoring, recomendaciones, anticipación
+api.js           ← OAuth Bold, parseo, mock
+map.js           ← Leaflet, capas, dibujo, geoloc
+ui.js            ← Rendering de resultados y detalle
+app.js           ← Flujo principal, navegación, init
 ```
 
-## Deploy en GitHub Pages
+## Actualizar convenios
 
-### Repo nuevo
+Editá `catalog.json` directamente en GitHub — no hace falta tocar código.
+El app lo fetchea al cargar. Si falla, usa el fallback de `catalog.js`.
+
+## Deploy en GitHub Pages
 
 1. [github.com/new](https://github.com/new) → nombre `agroadvisor`, público
 2. Upload files → arrastrá **todos los archivos** → Commit
 3. Settings → Pages → Branch: `main`, carpeta `/ (root)` → Save
-4. Esperar 1-2 min → `https://TU-USUARIO.github.io/agroadvisor/`
-
-### Actualizar
-
-Upload files → arrastrá los archivos modificados → Commit. Se actualiza en ~30 seg.
+4. URL: `https://TU-USUARIO.github.io/agroadvisor/`
 
 ## Para editar
 
 | Querés cambiar... | Archivo |
 |---|---|
-| Un convenio/merchant | `catalog.js` (buscá por nombre) |
+| Convenios/merchants | `catalog.json` (editar en GitHub directo) |
 | Pesos del scoring | `data.js` → const W |
 | Calendario agronómico | `data.js` → const CAL |
+| Textos de anticipación | `data.js` → const ANTICIPATION |
 | Textos de recomendación | `scoring.js` → buildRecomendacion |
 | Credenciales API | `index.html` → cfg-client/cfg-secret |
 | Look & feel | `styles.css` |
